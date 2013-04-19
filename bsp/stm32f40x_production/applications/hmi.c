@@ -193,7 +193,7 @@ static void rt_thread_entry_hmi( void* parameter )
 		CheckICCard();
 		pscr->timetick(rt_tick_get() );  // 每个子菜单下 显示的更新 操作  时钟源是 任务执行周期
 		pscr->keypress(keycheck() );  //每个子菜单的 按键检测  时钟源50ms timer
-		rt_thread_delay( 5 );
+		rt_thread_delay( RT_TICK_PER_SECOND/20 );
 		
 	}
 }

@@ -403,7 +403,7 @@ static void show( void *parent )
 /*按键处理*/
 static void keypress( unsigned int key )
 {
-	uint8_t buf[32];
+	uint8_t buf[64];
 	uint8_t i,h,m;
 
 	if(key==0) return;
@@ -438,8 +438,8 @@ static void keypress( unsigned int key )
 				printer(buf);
 			}
 			printer( "最近一次疲劳驾驶记录:\r\n无疲劳驾驶记录\r\n" );
-			rt_thread_delay(50);
-			step(50,1000);
+			rt_thread_delay(RT_TICK_PER_SECOND/4);
+			step(50,2);
 			
 			break;
 	}

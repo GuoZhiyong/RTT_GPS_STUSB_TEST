@@ -83,17 +83,6 @@ unsigned char	printer_data[PRINTER_DATA_SIZE];
 struct rt_ringbuffer		rb_printer_data;
 
 
-typedef enum
-{
-	IDLE=0,
-	GET_DATA,
-	HEAT_1_3,
-	HEAT_2_4,
-	STEP_DOT,
-	STEP_ROW,
-}PRINT_STATE;
-
-PRINT_STATE print_state;
 
 /*
    要打印的图案 24x24dot 24*3=72byte
@@ -109,8 +98,6 @@ PRINT_STATE print_state;
 static unsigned char	print_glyph[GLYPH_ROW][GLYPH_COL] = { 0 };
 
 static struct rt_device dev_printer;
-static struct rt_timer	tmr_printer;
-
 
 struct _PRINTER_PARAM
 {
@@ -122,7 +109,10 @@ struct _PRINTER_PARAM
 	uint16_t	margin_right;               //右边界
 } printer_param =
 {
-	1000, 2, { 5000, 10000, 15000, 20000 }, 6, 0, 0
+	//1000, 2, { 5000, 10000, 15000, 20000 }, 6, 0, 0  /*原来的168*us/7*/
+	//16800,2,{84000,168000,252000,340000},6,0,0  /*新的10*us/7 真正的us*/
+	//2,2,{8,16,25,35},6,0,0			/*折算到ticks*/
+	2,2,{5,10,20,30},6,0,0			/*折算到ticks*/
 };
 
 static unsigned short	dotremain = 384;    //还可使用的dot，每汉字24dot 每ascii 12dots
@@ -135,11 +125,16 @@ static unsigned char font_glyph[80];        //每个汉字或ascii的最大字节数 24x24d
 //延时nus
 //nus为要延时的us数.
 
+void printer_delay_us( const uint32_t ticks )
+{
+	rt_thread_delay(ticks);
+}
 
-static void printer_delay_us( const uint32_t usec )
+void printer_delay_us1( const uint32_t usec )
 {
 	__IO uint32_t	count	= 0;
-	const uint32_t	utime	= ( 168 * usec / 7 );
+	//const uint32_t	utime	= ( 168 * usec / 7 );
+	const uint32_t	utime	= ( 10 * usec / 7 );
 	do
 	{
 		if( ++count > utime )
@@ -320,16 +315,6 @@ void printer_print_glyph(void)
 	unsigned char	*p;
 	unsigned char	b, c, row, col_byte;
 /*缺纸检测 PA8 缺纸为高*/
-/*
-   if( GPIO_ReadInputDataBit( PHE_PORT, PHE_PIN ) )
-   {
-   	GPIO_SetBits( NO_PAPER_OUT_PORT, NO_PAPER_OUT_PIN );
-   return;
-   }else
-   {
-   GPIO_ResetBits( NO_PAPER_OUT_PORT, NO_PAPER_OUT_PIN );
-   }
- */
  	if( GPIO_ReadInputDataBit( PHE_PORT, PHE_PIN ) )
 	{
 		rt_kprintf( "NO Paper\r\n" );
@@ -626,86 +611,6 @@ static void printer_get_str_line( void )
 	}
 }
 
-/*
-   打印任务定时检查
- */
-static void timer_printer_cb( void* parameter )
-{
-	if( fprinting )
-	{
-		return;
-	}
-	printer_get_str_line( );
-}
-
-
-
-/*以1ms为时基进行打印控制*/
-
-__IO uint32_t timebase_1ms=0;
-__IO uint8_t  printt_row=0;
-
-
-/*填充移位的数据*/
-void shift_data(uint8_t row)
-{
-
-
-
-}
-
-
-
-
-
-
-
-void TIM3_IRQHandler(void)
-{
-	if (TIM_GetITStatus(TIM3, TIM_IT_Update) == RESET) return;
-	TIM_ClearITPendingBit(TIM3, TIM_IT_Update);
-	timebase_1ms++;
-
-}
-
-
-void TIM_Config(void)
-{
-  NVIC_InitTypeDef NVIC_InitStructure;
-  TIM_TimeBaseInitTypeDef  TIM_TimeBaseStructure;
-
-  /* TIM3 clock enable */
-  RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, ENABLE);
-
-  /* Enable the TIM3 gloabal Interrupt */
-  NVIC_InitStructure.NVIC_IRQChannel = TIM3_IRQn;
-  NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
-  NVIC_InitStructure.NVIC_IRQChannelSubPriority = 1;
-  NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-  NVIC_Init(&NVIC_InitStructure);
-
-
-/* Time base configuration */
-TIM_TimeBaseStructure.TIM_Period = 1000;			/* 1ms */
-TIM_TimeBaseStructure.TIM_Prescaler = (168-1);  /* 1M*/
-TIM_TimeBaseStructure.TIM_ClockDivision = TIM_CKD_DIV1;
-TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
-
-TIM_TimeBaseInit(TIM3, &TIM_TimeBaseStructure);
-
-
-TIM_ClearFlag(TIM3,TIM_FLAG_Update);
-/* TIM Interrupts enable */
-TIM_ITConfig(TIM3, TIM_IT_Update, ENABLE);
-
-/* TIM3 enable counter */
-TIM_Cmd(TIM3, ENABLE);
-
-
-
-}
-
-
 
 /**/
 static rt_err_t printer_init( rt_device_t dev )
@@ -840,6 +745,28 @@ static rt_err_t printer_close( rt_device_t dev )
 	return RT_EOK;
 }
 
+
+
+ALIGN( RT_ALIGN_SIZE )
+static char thread_printer_stack[512];
+struct rt_thread thread_printer;
+
+static void rt_thread_entry_printer( void* parameter )
+{
+
+	while(1)
+	{
+		if( fprinting==0 )
+		{
+			printer_get_str_line( );
+		}
+		rt_thread_delay(RT_TICK_PER_SECOND/10);
+	}
+
+}
+
+
+
 /***********************************************************
 * Function:       // 函数名称
 * Description:    // 函数功能、性能等的描述
@@ -851,12 +778,6 @@ static rt_err_t printer_close( rt_device_t dev )
 ***********************************************************/
 void printer_driver_init( void )
 {
-	rt_timer_init( &tmr_printer, \
-	               "tmr_p", \
-	               timer_printer_cb, NULL, \
-	               2, \
-	               RT_TIMER_FLAG_PERIODIC );
-
 	dev_printer.type		= RT_Device_Class_Char;
 	dev_printer.init		= printer_init;
 	dev_printer.open		= printer_open;
@@ -868,7 +789,14 @@ void printer_driver_init( void )
 
 	rt_device_register( &dev_printer, "printer", RT_DEVICE_FLAG_WRONLY );
 	rt_device_init( &dev_printer );
-	rt_timer_start( &tmr_printer );
+	
+	rt_thread_init( &thread_printer,
+	                "print",
+	                rt_thread_entry_printer,
+	                RT_NULL,
+	                &thread_printer_stack[0],
+	                sizeof( thread_printer_stack ), 6, 5 );
+	rt_thread_startup( &thread_printer );
 }
 
 /***********************************************************

@@ -120,9 +120,16 @@ void rtthread_startup(void)
 
 
 
+//extern void printer_delay_us( const uint32_t usec );
 
 int main(void)
 {
+
+	//printer_delay_us(1);
+	//printer_delay_us(10);
+	//printer_delay_us(100);
+	//printer_delay_us(1000);
+	//printer_delay_us(10000);
 
 	/* disable interrupt first */
 	rt_hw_interrupt_disable();

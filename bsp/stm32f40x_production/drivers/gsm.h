@@ -63,6 +63,7 @@ typedef enum
 }T_GSM_STATE;
 
 
+extern struct rt_mailbox mb_tts;
 
 void gsm_init(void);
 int gsm_send(uint8_t *pinfo,uint16_t len);

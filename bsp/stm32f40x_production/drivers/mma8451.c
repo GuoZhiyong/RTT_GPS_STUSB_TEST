@@ -599,7 +599,7 @@ uint16_t			param_mma8451_word2 = 0x1E02; /*0x1e:单位4ms的倍数  0x02:碰撞加速度门
 
 uint8_t				crash_counter = 0;
 
-uint8_t				CTRL_REG1_value			= 0x10;
+uint8_t				CTRL_REG1_value			= 0x20; /*00 010 */
 uint8_t				PL_BF_ZCOMP_REG_value	= 0xc7;
 uint8_t				PL_P_L_THS_REG_vlaue	= 0xcf;
 
@@ -620,10 +620,12 @@ void EXTI9_5_IRQHandler( void )
 		ret=IIC_RegRead( MMA845X_ADDR, PL_STATUS_REG, &value2 );
 		ret=IIC_RegRead( MMA845X_ADDR, PULSE_SRC_REG, &value3 );
 		if(value2!=0xc0)	/*有震动发生*/
+		//if(value2&0x0f)	/*有震动发生*/
 		{
-			mems_alarm_tick=30;	
+			mems_alarm_tick=10;	
 		}
-		//rt_kprintf("\nINT=%02x %02x %02x\n",value1,value2,value3);
+		rt_kprintf("\nINT=%02x %02x %02x\n",value1,value2,value3);
+		//rt_kprintf("\nINT=%02x\n",value2);
 		EXTI_ClearITPendingBit( EXTI_Line5 );
 	}
 	rt_interrupt_leave( );

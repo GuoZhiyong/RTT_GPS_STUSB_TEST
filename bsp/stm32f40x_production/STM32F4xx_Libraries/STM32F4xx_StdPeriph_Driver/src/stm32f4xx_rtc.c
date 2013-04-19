@@ -306,7 +306,7 @@
                                             RTC_FLAG_RECALPF | RTC_FLAG_SHPF))
 
 #define INITMODE_TIMEOUT         ((uint32_t) 0x00010000)
-#define SYNCHRO_TIMEOUT          ((uint32_t) 0x00020000)
+#define SYNCHRO_TIMEOUT          ((uint32_t) 0x00020000) 
 #define RECALPF_TIMEOUT          ((uint32_t) 0x00020000)
 #define SHPF_TIMEOUT             ((uint32_t) 0x00001000)
 

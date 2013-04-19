@@ -35,7 +35,7 @@ static struct rt_device dev_gps;
 static uint32_t			gps_out_mode = GPS_OUTMODE_ALL;
 
 /*串口接收缓存区定义*/
-#define UART5_RX_SIZE 256
+#define UART5_RX_SIZE 512
 
 /*
 typedef __packed struct
@@ -47,7 +47,8 @@ typedef __packed struct
 static LENGTH_BUF uart5_rxbuf;
 */
 static uint8_t	uart5_rxbuf[UART5_RX_SIZE];	/*预留前两个字节，保存长度*/
-static uint16_t uart5_rxbuf_wr = 0,uart5_rxbuf_rd = 0;
+static __IO uint16_t uart5_rxbuf_wr = 0;
+static __IO uint16_t uart5_rxbuf_rd = 0;
 
 /*gps原始信息数据区定义*/
 #define GPS_RAWINFO_SIZE 2048
@@ -173,14 +174,18 @@ unsigned short  CalcCRC16( unsigned char*  src, int startpoint, int len )
 
 void UART5_IRQHandler( void )
 {
-	rt_interrupt_enter( );
+	//rt_interrupt_enter( );
 	if( USART_GetITStatus( UART5, USART_IT_RXNE ) != RESET )
 	{
 		uart5_rxbuf[uart5_rxbuf_wr++]= USART_ReceiveData( UART5 );
 		uart5_rxbuf_wr%=UART5_RX_SIZE;
 		USART_ClearITPendingBit( UART5, USART_IT_RXNE );
 	}
-	rt_interrupt_leave( );
+	else
+	{
+		rt_kprintf("%02x ",UART5->SR);
+	}
+	//rt_interrupt_leave( );
 }
 
 /***********************************************************
@@ -385,12 +390,12 @@ static void rt_thread_entry_gps( void* parameter )
 	
 	while( 1 )
 	{
-		rt_thread_delay( RT_TICK_PER_SECOND / 10 );
+		rt_thread_delay( RT_TICK_PER_SECOND / 20 );
+		//rt_kprintf("g");
 		while(uart5_rxbuf_rd!=uart5_rxbuf_wr)
 		{
 			ch=uart5_rxbuf[uart5_rxbuf_rd++];
 			uart5_rxbuf_rd%=UART5_RX_SIZE;
-
 			gps_buf[gps_buf_wr++]=ch;
 			gps_buf_wr%=128;
 			gps_buf[gps_buf_wr]=0;

@@ -12,6 +12,8 @@
  *     David    96/10/12     1.0     build this moudle
  ***********************************************************/
 #include "scr.h"
+#include <rtthread.h>
+#include "gsm.h"
 
 
 
@@ -40,8 +42,81 @@ const unsigned char res_cross[] = {
 	0x60,                               /*[ **     ]*/
 	0x90,                               /*[*  *    ]*/
 };
-
 DECL_BMP( 4, 4, res_cross );
+
+const uint8_t res_rtc_ok[]={
+	0x00,0x00,
+	0x07,0xE0,
+	0x18,0x18,
+	0x20,0x04,
+	0x40,0x02,
+	0x40,0x06,
+	0x80,0x09,
+	0x80,0x11,
+	0xA0,0x21,
+	0x90,0x41,
+	0x48,0x82,
+	0x45,0x02,
+	0x22,0x04,
+	0x18,0x18,
+	0x07,0xE0,
+	0x00,0x00,
+};
+DECL_BMP(16,16, res_rtc_ok );
+
+
+const uint8_t res_rtc_err[]={
+	0x00,0x00,
+	0x07,0xE0,
+	0x18,0x18,
+	0x20,0x04,
+	0x40,0x02,
+	0x48,0x22,
+	0x84,0x41,
+	0x82,0x81,
+	0x81,0x01,
+	0x82,0x81,
+	0x44,0x42,
+	0x48,0x22,
+	0x20,0x04,
+	0x18,0x18,
+	0x07,0xE0,
+	0x00,0x00
+};
+DECL_BMP(16,16, res_rtc_err );
+
+
+const unsigned char res_iccard_empty[]={
+0x00,0x00,0x00,
+0x08,0x00,0x04,
+0x10,0x00,0x08,
+0x20,0x00,0x10,
+0x40,0x00,0x20,
+0xff,0xff,0xc0,
+0x00,0x00,0x00,
+0x00,0x00,0x00,
+};
+
+DECL_BMP( 24, 8, res_iccard_empty );
+
+
+const unsigned char res_iccard_insert[]={
+0x00,0x00,0x00,
+0x09,0xff,0xe4,
+0x13,0xff,0xc8,
+0x27,0xff,0x90,
+0x40,0x00,0x20,
+0xff,0xff,0xc0,
+0x00,0x00,0x00,
+0x00,0x00,0x00,
+};
+
+DECL_BMP( 24, 8, res_iccard_insert );
+
+
+
+static char cam_ch[4]={0x20,0x20,0x20,0x20};
+
 
 /*AD检测*/
 
@@ -50,7 +125,40 @@ DECL_BMP( 4, 4, res_cross );
 uint16_t ADC_ConValue[3];   //   3  个通道ID    0 : 电池 1: 灰线   2:  绿线
 
 /*首次定位的时刻*/
-static uint32_t fixed_sec = 0;
+static uint32_t gps_fixed_sec = 0;
+static uint8_t card_status=0;
+
+static uint32_t rtc_ok=0;
+
+
+
+/*测试标志，
+bit 0		RTC测试
+bit 1      IC卡
+bit 2 		震动
+bit 3      打印
+bit 4      CAM1
+bit 5      CAM2
+bit 6      CAM3
+bit 7      CAM4
+bit 8		GPS
+bit 8		GPRS
+*/
+#define TEST_BIT_RTC	0x01
+#define TEST_BIT_ICCARD	0x02
+#define TEST_BIT_MEMS	0x04
+#define TEST_BIT_GPS	0x08
+#define TEST_BIT_GPRS	0x10
+#define TEST_BIT_CAM1	0x20
+#define TEST_BIT_CAM2	0x40
+#define TEST_BIT_CAM3	0x80
+#define TEST_BIT_CAM4	0x100
+
+
+#define TEST_BIT_ALL	0x1FF
+static uint32_t test_flag=0;
+
+
 
 
 /**/
@@ -228,11 +336,25 @@ void TIM5_IRQHandler( void )
 static void showinfo(void)
 {
 	char buf[32];
-	if( fixed_sec )
+
+	lcd_asc0608(122-6*6,0,"041813",LCD_MODE_INVERT);
+	if( gps_fixed_sec )
 	{
-		sprintf( buf, "%02d:%02d", fixed_sec / 60, fixed_sec % 60 );
+		sprintf( buf, "%02d:%02d", gps_fixed_sec / 60, gps_fixed_sec % 60 );
 		lcd_asc0608( 0, 8, buf, LCD_MODE_SET );
 	}
+
+	if(card_status==1)
+	{
+		lcd_bitmap( 122 - 6*4, 24, &bmp_res_iccard_insert, LCD_MODE_SET );
+	}
+	else
+	{
+		lcd_bitmap( 122 - 6*4, 24, &bmp_res_iccard_empty, LCD_MODE_SET );
+	}
+	if(rtc_ok)
+		lcd_asc0608( 0, 24, "RTC", LCD_MODE_SET );
+		
 	lcd_update( 0, 31 );
 }
 
@@ -247,7 +369,7 @@ static void show( void *parent )
 {
 	GPIO_InitTypeDef	GPIO_InitStructure;
 	uint8_t				i;
-	char				buf[32];
+	char				buf[64];
 
 	scr_1_idle.parent = (PSCR)parent;
 
@@ -274,7 +396,6 @@ static void show( void *parent )
 	}
 /*PA0 速度信号*/
 
-
 	showinfo();
 
 }
@@ -293,11 +414,10 @@ static void keypress( unsigned int key )
 		case KEY_OK_PRESS:      /*返回上级菜单*/
 			break;
 		case KEY_UP_PRESS:		/*拍照*/
-			for(i=0;i<3;i++) step(100,1000);
 			break;
 		case KEY_DOWN_PRESS:    /*打印测试*/
 			GPIO_ResetBits(GPIOB,GPIO_Pin_6);
-			/*
+			
 			printer( "车牌号码:\r\n车牌分类:\r\n车辆VIN:\r\n驾驶员姓名:\r\n驾驶证代码:\r\n" );
 			
 			sprintf( buf, "打印时间:20%02d/%02d/%02d %02d:%02d:%02d\r\n" ,year,month,day,hour,minute,sec );
@@ -318,9 +438,8 @@ static void keypress( unsigned int key )
 				printer(buf);
 			}
 			printer( "最近一次疲劳驾驶记录:\r\n无疲劳驾驶记录\r\n" );
-			*/
-			printer( "最近一次超速驾驶记录:\r\n无超速驾驶记录\r\n" );	
-			step(25,1000);
+			rt_thread_delay(50);
+			step(50,1000);
 			
 			break;
 	}
@@ -331,17 +450,16 @@ static void timetick( unsigned int systick )
 {
 	static uint8_t	offset = 0;
 	uint32_t		sec;
-	uint8_t			buf[32];
+	uint8_t			buf[64];
 	uint8_t			i,j;
-
-
+	void * pmsg;
 
 	offset++;
 	if( offset >= 20 )
 	{
 		offset	= 0;
 		sec		= systick / 100;
-		sprintf( buf, "%02d:%02d  %04d  %02d%%", sec / 60, sec % 60, Frequency, DutyCycle );
+		sprintf( buf, "%02d:%02d  %04d", sec / 60, sec % 60, Frequency);
 		lcd_asc0608( 0, 0, buf, LCD_MODE_SET );
 		if( sec & 0x01 ) /*输出控制*/
 		{
@@ -350,27 +468,39 @@ static void timetick( unsigned int systick )
 		{
 			GPIO_ResetBits( GPIOB, GPIO_Pin_1 );
 		}
+		showinfo();
 	}
 
-/*IO输入控制*/
-
-	lcd_update( 0, 31 );
+	
 }
 
 /*处理自检状态的消息*/
-static void msg( void *pmsg )
+
+extern uint32_t iccard_beep_timeout;
+
+static void msg( void *plcdmsg )
 {
-	LCD_MSG		* plcd_msg = (LCD_MSG* )pmsg;
-	char		buf[64];
+	LCD_MSG		* plcd_msg = (LCD_MSG* )plcdmsg;
+	char		ch,buf[100];
 	uint32_t	i;
+	void *pmsg;
 
 	if( plcd_msg->id == LCD_MSG_ID_GPS )
 	{
-		if( ( fixed_sec == 0 ) && ( plcd_msg->info.gps_rmc.gps_av == 'A' ) )
+		if( ( gps_fixed_sec == 0 ) && ( plcd_msg->info.gps_rmc.gps_av == 'A' ) )
 		{
-			fixed_sec = rt_tick_get( ) * 10 / 1000;
-			sprintf( buf, "%02d:%02d", fixed_sec / 60, fixed_sec % 60 );
+			gps_fixed_sec = rt_tick_get( ) * 10 / 1000;
+			test_flag|=TEST_BIT_GPS;
+			sprintf( buf, "%02d:%02d", gps_fixed_sec / 60, gps_fixed_sec % 60 );
 			lcd_asc0608( 0, 8, buf, LCD_MODE_SET );
+			i=sprintf(buf,"AT%%TTS=2,3,5,\"475053D2D1B6A8CEBB\"\r\n",ch+0x30);
+			buf[i]=0;
+			pmsg=rt_malloc(i+1);
+			if(pmsg!=RT_NULL)
+			{
+				memcpy(pmsg,buf,i+1);
+				rt_mb_send(&mb_tts,(rt_uint32_t)pmsg);
+			}	
 		}
 		year=plcd_msg->info.gps_rmc.year;
 		month=plcd_msg->info.gps_rmc.month;
@@ -378,8 +508,11 @@ static void msg( void *pmsg )
 		hour= plcd_msg->info.gps_rmc.hour;
 		minute= plcd_msg->info.gps_rmc.minitue;
 		sec= plcd_msg->info.gps_rmc.sec;
-			
-		
+
+		time_set(hour,minute,sec);
+
+		date_set(year,month,day);
+
 		sprintf( buf, "%c%02d-%02d %02d:%02d:%02d",
 		         plcd_msg->info.gps_rmc.gps_av,month,day,hour,minute,sec );
 		lcd_asc0608( 122 - 6 * 15, 8, buf, LCD_MODE_SET );
@@ -398,7 +531,80 @@ static void msg( void *pmsg )
 		i=rt_tick_get()/100;
 		sprintf( buf, "%02d:%02d  GPRS",i/60,i%60);
 		lcd_asc0608( 0,16, buf, LCD_MODE_SET );
+		test_flag|=TEST_BIT_GPRS;
 
+	}
+	if(plcd_msg->id == LCD_MSG_ID_CAM)
+	{
+		ch=plcd_msg->info.payload[0];
+		switch(ch)
+		{
+			case 1: test_flag|=TEST_BIT_CAM1; break;
+			case 2: test_flag|=TEST_BIT_CAM2; break;
+			case 3: test_flag|=TEST_BIT_CAM3; break;
+			case 4: test_flag|=TEST_BIT_CAM4; break;
+
+		}
+		if(plcd_msg->info.payload[1]==SUCCESS)
+		{
+			i=sprintf(buf,"AT%%TTS=2,3,5,\"C5C4D5D5%02xD5FDB3A3\"\r\n",ch+0x30);
+			cam_ch[ch-1]=0x30+ch;
+			lcd_asc0608( 122 - 6*4, 16, cam_ch, LCD_MODE_SET );
+		}
+		else
+		{
+			i=sprintf(buf,"AT%%TTS=2,3,5,\"C5C4D5D5%02xD2ECB3A3\"\r\n",ch+0x30);
+		}
+		buf[i]=0;
+		pmsg=rt_malloc(i+1);
+		if(pmsg!=RT_NULL)
+		{
+			memcpy(pmsg,buf,i+1);
+			rt_mb_send(&mb_tts,(rt_uint32_t)pmsg);
+		}		
+
+	}
+	if(plcd_msg->id == LCD_MSG_ID_ICCARD)
+	{
+		iccard_beep_timeout=10;
+		card_status=plcd_msg->info.payload[0];
+		test_flag|=TEST_BIT_ICCARD;
+	}
+
+	if(plcd_msg->id == LCD_MSG_ID_RTC)
+	{
+		memset(buf,0,32);
+		if(plcd_msg->info.payload[0]==SUCCESS)
+		{
+			i=sprintf(buf,"AT%%TTS=2,3,5,\"525443D5FDB3A3\"\r\n",ch+0x30);
+			test_flag|=TEST_BIT_RTC;
+			rtc_ok=1;
+		}
+		else
+		{
+			i=sprintf(buf,"AT%%TTS=2,3,5,\"525443D2ECB3A3\"\r\n",ch+0x30);
+		}
+		rt_kprintf("\r\nRTC len=%d\r\n",i);
+		buf[i]=0;
+		pmsg=rt_malloc(i+1);
+		if(pmsg!=RT_NULL)
+		{
+			memcpy(pmsg,buf,i+1);
+			rt_mb_send(&mb_tts,(rt_uint32_t)pmsg);
+		}			
+		
+	}
+
+	if(test_flag==TEST_BIT_ALL)
+	{
+		i=sprintf(buf,"AT%%TTS=2,3,5,\"B2E2CAD4CDEAB3C9\"\r\n");
+		buf[i]=0;
+		pmsg=rt_malloc(i+1);
+		if(pmsg!=RT_NULL)
+		{
+			memcpy(pmsg,buf,i+1);
+			rt_mb_send(&mb_tts,(rt_uint32_t)pmsg);
+		}
 	}
 
 	showinfo();

@@ -24,7 +24,6 @@
 #include "pt.h"
 #include "pt_port.h"
 
-
 #include "scr.h"
 
 #ifdef M66
@@ -86,7 +85,11 @@ struct _gsm_param
 
 static struct pt	pt_gsm_power;
 
+static uint8_t		tts_playing = 1; /*tts正在播报*/
+struct rt_mailbox	mb_tts;
 
+#define MB_TTS_POOL_SIZE 64
+static uint8_t mb_tts_pool[MB_TTS_POOL_SIZE];
 
 
 /***********************************************************
@@ -358,10 +361,11 @@ static rt_err_t m66_init( rt_device_t dev )
 	GPIO_Init( GSM_RST_PORT, &GPIO_InitStructure );
 	GPIO_SetBits( GSM_RST_PORT, GSM_RST_PIN );
 
-
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_9;
+	GPIO_InitStructure.GPIO_OType	= GPIO_OType_PP;
+	GPIO_InitStructure.GPIO_Pin		= GPIO_Pin_9;
 	GPIO_Init( GPIOD, &GPIO_InitStructure );
-	GPIO_SetBits( GPIOD, GPIO_Pin_9 );
+	//GPIO_SetBits( GPIOD, GPIO_Pin_9 );
+	GPIO_ResetBits( GPIOD, GPIO_Pin_9 ); /*开功放*/
 
 /*uart4 管脚设置*/
 
@@ -391,7 +395,7 @@ static rt_err_t m66_init( rt_device_t dev )
 	USART_Init( UART4, &USART_InitStructure );
 	/* Enable USART */
 	USART_Cmd( UART4, ENABLE );
-	
+
 	USART_ITConfig( UART4, USART_IT_RXNE, ENABLE );
 
 	return RT_EOK;
@@ -519,12 +523,12 @@ static rt_err_t m66_control( rt_device_t dev, rt_uint8_t cmd, void *arg )
 ***********************************************************/
 static void gsmrx_cb( uint8_t *pInfo, uint16_t len )
 {
-	static LCD_MSG lcd_msg;
-	int		i, count, newlen;
-	uint8_t tbl[24] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 0, 0, 0, 0, 0, 0, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf };
-	char	c, *pmsg;
-	uint8_t *psrc, *pdst;
-	int32_t infolen, link;
+	static LCD_MSG	lcd_msg;
+	int				i, count, newlen;
+	uint8_t			tbl[24] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 0, 0, 0, 0, 0, 0, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf };
+	char			c, *pmsg;
+	uint8_t			*psrc, *pdst;
+	int32_t			infolen, link;
 
 /*网络侧的信息，直接通知上层软件*/
 	if( fgsm_rawdata_out )
@@ -576,19 +580,22 @@ static void gsmrx_cb( uint8_t *pInfo, uint16_t len )
 /*有呼叫进来*/
 	if( strncmp( psrc, "RING", 4 ) == 0 )
 	{
-		lcd_msg.id						= LCD_MSG_ID_GSM;
-		lcd_msg.info.payload[0]		= 1;		/*接通*/
+		lcd_msg.id				= LCD_MSG_ID_GSM;
+		lcd_msg.info.payload[0] = 1;    /*接通*/
 		pscr->msg( (void*)&lcd_msg );
 	}
-	
+
 	if( strncmp( psrc, "NOCARRIER", 9 ) == 0 )
 	{
-		lcd_msg.id						= LCD_MSG_ID_GSM;
-		lcd_msg.info.payload[0]		= 2;		/*挂断*/
+		lcd_msg.id				= LCD_MSG_ID_GSM;
+		lcd_msg.info.payload[0] = 2;    /*挂断*/
 		pscr->msg( (void*)&lcd_msg );
 	}
 
-
+	if( strncmp( psrc, "%TTS: 0", 7 ) == 0 )
+	{
+		tts_playing = 0;
+	}
 	/*直接发送到Mailbox中*/
 	pmsg = rt_malloc( len );
 	if( pmsg != RT_NULL )
@@ -608,6 +615,27 @@ rt_err_t pt_resp_STR_OK( char *p, uint16_t len )
 	pfind = strstr( p, "OK" );
 	if( pfind )
 	{
+		return RT_EOK; /*找到了*/
+	}
+	return RT_ERROR;
+}
+
+/***********************************************************
+* Function:
+* Description:
+* Input:
+* Input:
+* Output:
+* Return:
+* Others:
+***********************************************************/
+rt_err_t pt_resp_TTS_OK( char *p, uint16_t len )
+{
+	char *pfind = RT_NULL;
+	pfind = strstr( p, "%TTS: 0" );
+	if( pfind )
+	{
+		tts_playing = 0;
 		return RT_EOK; /*找到了*/
 	}
 	return RT_ERROR;
@@ -738,7 +766,6 @@ rt_err_t pt_resp_ETCPIP( char *p, uint16_t len )
 	return RT_EOK;
 }
 
-
 /***********************************************************
 * Function:
 * Description:
@@ -750,16 +777,15 @@ rt_err_t pt_resp_ETCPIP( char *p, uint16_t len )
 ***********************************************************/
 rt_err_t pt_resp_IPOPENX( char *p, uint16_t len )
 {
-	LCD_MSG	lcd_msg;
+	LCD_MSG lcd_msg;
 	uint8_t i, stage = 0;
 	char	*psrc = p;
 	char	*pdst;
 
 	if( strstr( p, "CONNECT" ) != RT_NULL )
 	{
-
 		lcd_msg.id				= LCD_MSG_ID_GPRS;
-		lcd_msg.info.payload[0]		= 1;		/*接通*/
+		lcd_msg.info.payload[0] = 1; /*接通*/
 		pscr->msg( (void*)&lcd_msg );
 		return RT_EOK;
 	}
@@ -780,7 +806,7 @@ rt_err_t pt_resp( RESP_FUNC func )
 /*有应答，执行相应的函数*/
 	len = ( ( *pstr ) << 8 ) | ( *( pstr + 1 ) );
 	ret = func( pstr + 2, len );
-	rt_kprintf( "pt_resp ret=%x\r\n", ret );
+	//rt_kprintf( "pt_resp ret=%x\r\n", ret );
 	rt_free( pstr );
 	return ret;
 }
@@ -799,24 +825,25 @@ typedef struct
 /**/
 static int protothread_gsm_power( struct pt *pt )
 {
-	static AT_CMD_RESP		at_init[] =
+	static AT_CMD_RESP at_init[] =
 	{
-		{ RT_NULL,											 pt_resp_STR_OK, RT_TICK_PER_SECOND * 10, 1	 },
-		{ RT_NULL,											 pt_resp_STR_OK, RT_TICK_PER_SECOND * 10, 1	 },
-		{ "ATE0\r\n",										 pt_resp_STR_OK, RT_TICK_PER_SECOND * 5,  1	 },
-		{ "ATV1\r\n",										 pt_resp_STR_OK, RT_TICK_PER_SECOND * 5,  1	 },
-		{ "AT%TTS=2,3,5,\"BBB6D3ADCAB9D3C3544342CEC0D0C7B6A8CEBBB3B5D4D8D6D5B6CB\"\r\n",pt_resp_STR_OK, RT_TICK_PER_SECOND * 5,  1	 },
-		{ "AT+CPIN?\r\n",									 pt_resp_CPIN,	 RT_TICK_PER_SECOND * 3,  10 },
-		{ "AT+CREG?\r\n",									 pt_resp_CGREG,	 RT_TICK_PER_SECOND * 3,  10 },
-		{ "AT+CIMI\r\n",									 pt_resp_CIMI,	 RT_TICK_PER_SECOND * 3,  1	 },
-		{ "AT+CGREG?\r\n",									 pt_resp_CGREG,	 RT_TICK_PER_SECOND * 3,  10 },
-		{ "AT+CGATT?\r\n",									 pt_resp_CGATT,	 RT_TICK_PER_SECOND * 3,  10 },
-		{ "AT+CGDCONT=1,\"IP\",\"CMNET\"\r\n",				 pt_resp_STR_OK, RT_TICK_PER_SECOND * 10, 1	 },
-		{ "AT%ETCPIP=1,\"\",\"\"\r\n",						 pt_resp_STR_OK, RT_TICK_PER_SECOND * 30, 1	 },
-		{ "AT%ETCPIP?\r\n",									 pt_resp_ETCPIP, RT_TICK_PER_SECOND * 3,  1	 },
-		{ "AT%IOMODE=1,2,1\r\n",							 pt_resp_STR_OK, RT_TICK_PER_SECOND * 3,  1	 },
+		{ RT_NULL,											pt_resp_STR_OK,	 RT_TICK_PER_SECOND * 10, 1	 },
+		{ RT_NULL,											pt_resp_STR_OK,	 RT_TICK_PER_SECOND * 10, 1	 },
+		{ "ATE0\r\n",										pt_resp_STR_OK,	 RT_TICK_PER_SECOND * 5,  1	 },
+		{ "ATV1\r\n",										pt_resp_STR_OK,	 RT_TICK_PER_SECOND * 5,  1	 },
+		{ "AT%TTS=2,3,5,\"BFAACABCB2E2CAD4\"\r\n",			pt_resp_STR_OK,	 RT_TICK_PER_SECOND * 20, 1	 },
+		{ "AT+CPIN?\r\n",									pt_resp_CPIN,	 RT_TICK_PER_SECOND * 3,  10 },
+		{ "AT+CREG?\r\n",									pt_resp_CGREG,	 RT_TICK_PER_SECOND * 3,  10 },
+		{ "AT+CIMI\r\n",									pt_resp_CIMI,	 RT_TICK_PER_SECOND * 3,  1	 },
+		{ "AT+CGREG?\r\n",									pt_resp_CGREG,	 RT_TICK_PER_SECOND * 3,  10 },
+		{ "AT+CGATT?\r\n",									pt_resp_CGATT,	 RT_TICK_PER_SECOND * 3,  10 },
+		{ "AT+CGDCONT=1,\"IP\",\"CMNET\"\r\n",				pt_resp_STR_OK,	 RT_TICK_PER_SECOND * 10, 1	 },
+		{ "AT%ETCPIP=1,\"\",\"\"\r\n",						pt_resp_STR_OK,	 RT_TICK_PER_SECOND * 30, 1	 },
+		{ "AT%ETCPIP?\r\n",									pt_resp_ETCPIP,	 RT_TICK_PER_SECOND * 3,  1	 },
+		{ "AT%IOMODE=1,2,1\r\n",							pt_resp_STR_OK,	 RT_TICK_PER_SECOND * 3,  1	 },
 		{ "AT%IPOPENX=1,\"UDP\",\"60.28.50.210\",9131\r\n", pt_resp_IPOPENX, RT_TICK_PER_SECOND * 3,  1	 },
 	};
+
 	static struct pt_timer	timer_gsm_power;
 	static uint8_t			at_init_index	= 0;
 	static uint8_t			at_init_retry	= 0;
@@ -832,8 +859,7 @@ static int protothread_gsm_power( struct pt *pt )
 		GPIO_SetBits( GSM_TERMON_PORT, GSM_TERMON_PIN );
 		GPIO_SetBits( GSM_PWR_PORT, GSM_PWR_PIN );
 
-
-		GPIO_ResetBits(GPIOD,GPIO_Pin_9); /*开功放*/
+		//GPIO_ResetBits(GPIOD,GPIO_Pin_9); /*开功放*/
 
 		for( at_init_index = 0; at_init_index < sizeof( at_init ) / sizeof( AT_CMD_RESP ); at_init_index++ )
 		{
@@ -841,8 +867,8 @@ static int protothread_gsm_power( struct pt *pt )
 			{
 				if( at_init[at_init_index].atcmd != RT_NULL )
 				{
-					rt_kprintf( "%08d gsm_send>%s", rt_tick_get( ), at_init[at_init_index].atcmd );
 					m66_write( &dev_gsm, 0, at_init[at_init_index].atcmd, strlen( at_init[at_init_index].atcmd ) );
+					rt_kprintf( "%08d gsm_send>%s", rt_tick_get( ), at_init[at_init_index].atcmd );
 				}
 				pt_timer_set( &timer_gsm_power, at_init[at_init_index].timeout );
 				PT_WAIT_UNTIL( pt, pt_timer_expired( &timer_gsm_power ) || ( RT_EOK == pt_resp( at_init[at_init_index].resp ) ) );
@@ -859,7 +885,7 @@ static int protothread_gsm_power( struct pt *pt )
 				PT_EXIT( pt );
 			}
 		}
-		GPIO_SetBits(GPIOD,GPIO_Pin_9); /*关功放*/
+		//GPIO_SetBits(GPIOD,GPIO_Pin_9); /*关功放*/
 		gsm_state = GSM_AT;                             /*切换到AT状态*/
 	}
 	if( gsm_state == GSM_POWEROFF )
@@ -870,7 +896,6 @@ static int protothread_gsm_power( struct pt *pt )
 	}
 	PT_END( pt );
 }
-
 
 ALIGN( RT_ALIGN_SIZE )
 static char thread_gsm_stack[512];
@@ -891,6 +916,7 @@ static void rt_thread_entry_gsm( void* parameter )
 	rt_tick_t		curr_ticks;
 	rt_err_t		res;
 	unsigned char	ch;
+	char			*ptts;
 
 	PT_INIT( &pt_gsm_power );
 
@@ -913,7 +939,19 @@ static void rt_thread_entry_gsm( void* parameter )
 				gsm_rx_wr = 0;
 			}
 		}
+		if( tts_playing == 0 )
+		{
+			res = rt_mb_recv( &mb_tts, (rt_uint32_t*)&ptts, 0 );
+			if( res == RT_EOK )
+			{
+				rt_kprintf( "\r\nTTS(%d)>%s", strlen( ptts ), ptts );
+				m66_write( &dev_gsm, 0, ptts, strlen( ptts ) );
+				tts_playing = 1;
+				rt_free( ptts );
+			}
+		}
 		protothread_gsm_power( &pt_gsm_power );
+
 		rt_thread_delay( RT_TICK_PER_SECOND / 20 );
 	}
 }
@@ -935,6 +973,8 @@ void gsm_init( void )
 	rt_ringbuffer_init( &rb_uart4_rx, uart4_rxbuf, UART4_RX_SIZE );
 
 	rt_mb_init( &mb_gsmrx, "gsm_rx", &mb_gsmrx_pool, MB_GSMRX_POOL_SIZE / 4, RT_IPC_FLAG_FIFO );
+
+	rt_mb_init( &mb_tts, "tts", &mb_tts_pool, MB_TTS_POOL_SIZE / 4, RT_IPC_FLAG_FIFO );
 
 	rt_thread_init( &thread_gsm,
 	                "gsm",

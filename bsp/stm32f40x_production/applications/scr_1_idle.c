@@ -417,7 +417,7 @@ static void keypress( unsigned int key )
 			break;
 		case KEY_DOWN_PRESS:    /*打印测试*/
 			GPIO_ResetBits(GPIOB,GPIO_Pin_6);
-			
+		
 			printer( "车牌号码:\r\n车牌分类:\r\n车辆VIN:\r\n驾驶员姓名:\r\n驾驶证代码:\r\n" );
 			
 			sprintf( buf, "打印时间:20%02d/%02d/%02d %02d:%02d:%02d\r\n" ,year,month,day,hour,minute,sec );
@@ -437,10 +437,7 @@ static void keypress( unsigned int key )
 				sprintf(buf,"%02d:%02d 000km/h\r\n",h,m);
 				printer(buf);
 			}
-			printer( "最近一次疲劳驾驶记录:\r\n无疲劳驾驶记录\r\n" );
-			rt_thread_delay(RT_TICK_PER_SECOND/4);
-			step(50,2);
-			
+			printer( "最近一次疲劳驾驶记录:\r\n无疲劳驾驶记录\r\n\n\n\n\n" );
 			break;
 	}
 }

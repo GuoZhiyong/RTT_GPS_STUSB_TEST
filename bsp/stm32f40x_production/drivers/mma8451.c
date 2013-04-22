@@ -619,10 +619,14 @@ void EXTI9_5_IRQHandler( void )
 		ret=IIC_RegRead( MMA845X_ADDR, INT_SOURCE_REG, &value1 );
 		ret=IIC_RegRead( MMA845X_ADDR, PL_STATUS_REG, &value2 );
 		ret=IIC_RegRead( MMA845X_ADDR, PULSE_SRC_REG, &value3 );
-		if(value2!=0xc0)	/*有震动发生*/
-		//if(value2&0x0f)	/*有震动发生*/
+		if((value2&0x7F)<0x40)	/*有倾斜发生  0x8x 倾斜发生*/
 		{
 			mems_alarm_tick=10;	
+		}
+		else					/*0xcx 倾斜还原*/
+		{
+
+
 		}
 		rt_kprintf("\nINT=%02x %02x %02x\n",value1,value2,value3);
 		//rt_kprintf("\nINT=%02x\n",value2);
@@ -685,58 +689,21 @@ static uint8_t mma8451_config( uint16_t param1, uint16_t param2 )
 	param_mma8451_word1=param1;
 	param_mma8451_word2=param2;
 
-//standby
+/*启动配置*/
 	if( IIC_RegWrite( MMA845X_ADDR, CTRL_REG1, ( CTRL_REG1_value & ~ACTIVE_MASK ) ) )
 	{
 		goto lbl_mma8451_config_err;
 	}
-
-
-/*
-   res = IIC_RegWrite( MMA845X_ADDR, CTRL_REG1, CTRL_REG1_value);
-   if( res )
-   {
-   goto lbl_mma8451_config_err;
-   }
- */
+	
 	if( IIC_RegWrite( MMA845X_ADDR, XYZ_DATA_CFG_REG, FULL_SCALE_4G ) )
 	{
 		goto lbl_mma8451_config_err;
 	}
 
 
-	/*Step 2: Set the data rate to 50 Hz (for example, but can choose any sample rate).
-	   CTRL_REG1_Data = IIC_RegRead(0x2A); //Note: Can combine this step with above
-	   CTRL_REG1_Data& = 0xC7; //Clear the sample rate bits
-	   CTRL_REG1_Data | = 0x20; //Set the sample rate bits to 50 Hz
-	   IC_RegWrite(0x2A, CTRL_REG1_Data); //Write updated value into the register.
-	 */
+/*设置水平垂直检测  Portrait/Landscape Detection.*/
 
-
-/*
-   res = IIC_RegRead( MMA845X_ADDR, CTRL_REG1, &value );
-   if( res )
-   {
-   goto lbl_mma8451_config_err;
-   }
-   value	&= 0xC7;
-   value	|= 0x20;
-   res		= IIC_RegWrite( MMA845X_ADDR, CTRL_REG1, value );
-   if( res )
-   {
-   goto lbl_mma8451_config_err;
-   }
- */
-
-
-	/*
-	   Step 3: Set the PL_EN bit in Register 0x11 PL_CFG. This will enable the orientation detection.
-	   PLCFG_Data = IIC_RegRead (0x11);
-	   PLCFG_Data | = 0x40;
-	   IIC_RegWrite(0x11, PLCFG_Data);
-	 */
-
-	if( IIC_RegWrite( MMA845X_ADDR, PL_CFG_REG, 0xc0 ) )
+	if( IIC_RegWrite( MMA845X_ADDR, PL_CFG_REG, 0x40 ) )
 	{
 		goto lbl_mma8451_config_err;
 	}
@@ -772,11 +739,12 @@ static uint8_t mma8451_config( uint16_t param1, uint16_t param2 )
 	   IIC_RegWrite(0x13, PL_BF_ZCOMP_Data); //Write in the updated Z-lockout angle
 	 */
 
+/*
 	if( IIC_RegWrite( MMA845X_ADDR, PL_BF_ZCOMP_REG, PL_BF_ZCOMP_REG_value ) )
 	{
 		goto lbl_mma8451_config_err;
 	}
-
+*/
 
 	/*
 	   Step 6: Set the Trip Threshold Angle
@@ -819,27 +787,12 @@ static uint8_t mma8451_config( uint16_t param1, uint16_t param2 )
 	   IIC_RegWrite(0x14, P_L_THS_Data);
 	 */
 
+/*
 	if( IIC_RegWrite( MMA845X_ADDR, PL_P_L_THS_REG, PL_P_L_THS_REG_vlaue ) )
 	{
 		goto lbl_mma8451_config_err;
 	}
-
-
-	/*
-	   Step 8: Register 0x2D, Control Register 4 configures all embedded features for interrupt
-	   detection.
-	   To set this device up to run an interrupt service routine:
-	   Program the Orientation Detection bit in Control Register 4.
-	   Set bit 4 to enable the orientation detection “INT_EN_LNDPRT”.
-	   CTRL_REG4_Data = IIC_RegRead(0x2D); //Read out the contents of the register
-	   CTRL_REG4_Data | = 0x10; //Set bit 4
-	   IIC_RegWrite(0x2D, CTRL_REG4_Data); //Set the bit and write into CTRL_REG4
-	 */
-
-	if( IIC_RegWrite( MMA845X_ADDR, CTRL_REG4, 0x10 ) )
-	{
-		goto lbl_mma8451_config_err;
-	}
+*/
 
 
 	/*
@@ -874,19 +827,6 @@ static uint8_t mma8451_config( uint16_t param1, uint16_t param2 )
 	{
 		goto lbl_mma8451_config_err;
 	}
-
-
-	/*
-	   Step 11: Put the device in Active Mode
-	   CTRL_REG1_Data = IIC_RegRead(0x2A); //Read out the contents of the register
-	   CTRL_REG1_Data | = 0x01; //Change the value in the register to Active Mode.
-	   IIC_RegWrite(0x2A, CTRL_REG1_Data); //Write in the updated value to put the device in Active Mode
-	 */
-
-//	value=IIC_RegRead(MMA845X_ADDR,CTRL_REG1);
-//	value |= 0x01;
-//	IIC_RegWrite(MMA845X_ADDR,CTRL_REG1,value);
-//active
 
 /*TAP设置*/
 	if( IIC_RegWrite( MMA845X_ADDR, PULSE_CFG_REG, 0xd5 ) )
@@ -939,19 +879,22 @@ static uint8_t mma8451_config( uint16_t param1, uint16_t param2 )
 		goto lbl_mma8451_config_err;
 	}
 
+/*
+设置中断源 
+	bit4 INT_EN_LNDPRT
+	bit3 INT_EN_PULSE
+*/	
 
+	if( IIC_RegWrite( MMA845X_ADDR, CTRL_REG4, 0x10 ) )
+	{
+		goto lbl_mma8451_config_err;
+	}
 
+/*设置完成*/
 	if( IIC_RegWrite( MMA845X_ADDR, CTRL_REG1, ( CTRL_REG1_value | ACTIVE_MASK ) ) )
 	{
 		goto lbl_mma8451_config_err;
 	}
-
-	if( IIC_RegWrite( MMA845X_ADDR, CTRL_REG4, 0x18 ) )
-	{
-		goto lbl_mma8451_config_err;
-	}
-
-
 	return ERR_NONE;
 
 lbl_mma8451_config_err:
@@ -959,6 +902,29 @@ lbl_mma8451_config_err:
 }
 
 FINSH_FUNCTION_EXPORT(mma8451_config ,setup sensor);
+
+
+uint8_t iic_reg(uint8_t reg,uint8_t value)
+{
+
+	if( IIC_RegWrite( MMA845X_ADDR, CTRL_REG1, ( CTRL_REG1_value & ~ACTIVE_MASK ) ) )
+	{
+		return 1;
+	}
+
+	if( IIC_RegWrite( MMA845X_ADDR, reg, value ));
+	{
+
+	}
+	if( IIC_RegWrite( MMA845X_ADDR, CTRL_REG1, ( CTRL_REG1_value |ACTIVE_MASK ) ) )
+	{
+		return 1;
+	}
+}
+FINSH_FUNCTION_EXPORT(iic_reg ,setup sensor);
+
+
+
 
 
 

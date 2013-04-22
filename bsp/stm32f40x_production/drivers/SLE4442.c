@@ -733,7 +733,7 @@ void CheckICCard( void )
 					lcdmsg.id=LCD_MSG_ID_ICCARD;
 					lcdmsg.info.payload[0]=1; 
 					pscr->msg(&lcdmsg);
-					i=sprintf(buf,"AT%%TTS=2,3,5,\"4943BFA8D5FDB3A3\"\r\n");
+					i=sprintf(buf,"AT%%TTS=2,3,5,\"4943BFA8D5FDB3A3\"\r\n"); /*IC¿¨Õý³£*/
 				}
 				else
 				{
@@ -741,7 +741,7 @@ void CheckICCard( void )
 					lcdmsg.id=LCD_MSG_ID_ICCARD;
 					lcdmsg.info.payload[0]=2; 
 					pscr->msg(&lcdmsg);
-					i=sprintf(buf,"AT%%TTS=2,3,5,\"4943BFA8B4EDCEF3\"\r\n");
+					i=sprintf(buf,"AT%%TTS=2,3,5,\"4943BFA8B4EDCEF3\"\r\n"); /*IC¿¨´íÎó*/
 				}
 				buf[i]=0;
 				rt_kprintf("\r\nICCARD(%d)\r\n",i);

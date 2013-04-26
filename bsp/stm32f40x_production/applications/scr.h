@@ -18,7 +18,7 @@ typedef void (*MSG)(void *pmsg);
 #define LCD_MSG_ID_RTC	0x0005
 #define LCD_MSG_ID_CAM	0x0006
 #define LCD_MSG_ID_ICCARD	0x0007
-
+#define LCD_MSG_ID_CSQ	0x0008
 
 
 

@@ -124,12 +124,16 @@ static char cam_ch[4]={0x20,0x20,0x20,0x20};
 
 uint16_t ADC_ConValue[3];   //   3  个通道ID    0 : 电池 1: 灰线   2:  绿线
 
+
+/*要显示的状态信息*/
+
 /*首次定位的时刻*/
 static uint32_t gps_fixed_sec = 0;
 static uint8_t card_status=0;
-
 static uint32_t rtc_ok=0;
-
+static uint8_t	gsm_csq=0xff;
+static uint32_t gprs_ok_past_sec=0;
+static uint8_t	mems_status=ERROR;
 
 
 /*测试标志，
@@ -353,8 +357,25 @@ static void showinfo(void)
 		lcd_bitmap( 122 - 6*4, 24, &bmp_res_iccard_empty, LCD_MODE_SET );
 	}
 	if(rtc_ok)
+	{
 		lcd_asc0608( 0, 24, "RTC", LCD_MODE_SET );
-		
+	}
+	
+	if(gsm_csq!=0xff)
+	{
+		sprintf(buf,"csq:%02d",gsm_csq);
+		lcd_asc0608(122-6*8,16,buf,LCD_MODE_SET);
+	}
+
+	if(gprs_ok_past_sec)
+	{
+		sprintf( buf, "%02d:%02d  GPRS",gprs_ok_past_sec/60,gprs_ok_past_sec%60);
+		lcd_asc0608( 0,16, buf, LCD_MODE_SET );
+	}
+	if(mems_status==SUCCESS)
+	{
+		lcd_asc0608( 30,24,"MEMS", LCD_MODE_SET );
+	}
 	lcd_update( 0, 31 );
 }
 
@@ -443,6 +464,12 @@ static void keypress( unsigned int key )
 }
 
 /*系统时间50ms*/
+
+extern uint8_t 	ctrlbit_printer_3v3_on;
+extern uint8_t	ctrlbit_buzzer;
+/*记录上一次的状态*/
+uint8_t ctrlbit_status=0;
+
 static void timetick( unsigned int systick )
 {
 	static uint8_t	offset = 0;
@@ -450,6 +477,13 @@ static void timetick( unsigned int systick )
 	uint8_t			buf[64];
 	uint8_t			i,j;
 	void * pmsg;
+/*发生状态改变*/
+	if((ctrlbit_printer_3v3_on|ctrlbit_buzzer)^ctrlbit_status)
+	{
+		showinfo();
+		ctrlbit_status=(ctrlbit_printer_3v3_on|ctrlbit_buzzer);
+	}
+	
 
 	offset++;
 	if( offset >= 20 )
@@ -525,12 +559,16 @@ static void msg( void *plcdmsg )
 	}
 	if(plcd_msg->id == LCD_MSG_ID_GPRS)
 	{
-		i=rt_tick_get()/100;
-		sprintf( buf, "%02d:%02d  GPRS",i/60,i%60);
-		lcd_asc0608( 0,16, buf, LCD_MODE_SET );
+		gprs_ok_past_sec=rt_tick_get()/100;
 		test_flag|=TEST_BIT_GPRS;
 
 	}
+
+	if(plcd_msg->id == LCD_MSG_ID_MEMS)
+	{
+		mems_status=plcd_msg->info.payload[0];
+
+	}	
 	if(plcd_msg->id == LCD_MSG_ID_CAM)
 	{
 		ch=plcd_msg->info.payload[0];
@@ -590,6 +628,14 @@ static void msg( void *plcdmsg )
 			rt_mb_send(&mb_tts,(rt_uint32_t)pmsg);
 		}			
 		
+	}
+
+	if(plcd_msg->id == LCD_MSG_ID_CSQ)
+	{
+		if(plcd_msg->info.payload[0]<gsm_csq)
+		{
+			gsm_csq=plcd_msg->info.payload[0];
+		}
 	}
 
 	if(test_flag==TEST_BIT_ALL)

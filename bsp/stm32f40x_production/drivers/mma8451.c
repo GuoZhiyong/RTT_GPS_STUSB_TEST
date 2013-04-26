@@ -686,8 +686,12 @@ void EXTILine5_Config( void )
 static uint8_t mma8451_config( uint16_t param1, uint16_t param2 )
 {
 	unsigned char res, value;
+	LCD_MSG lcdmsg;
+	
 	param_mma8451_word1=param1;
 	param_mma8451_word2=param2;
+
+	
 
 /*Æô¶¯ÅäÖÃ*/
 	if( IIC_RegWrite( MMA845X_ADDR, CTRL_REG1, ( CTRL_REG1_value & ~ACTIVE_MASK ) ) )
@@ -895,9 +899,16 @@ static uint8_t mma8451_config( uint16_t param1, uint16_t param2 )
 	{
 		goto lbl_mma8451_config_err;
 	}
+	lcdmsg.id=LCD_MSG_ID_MEMS;
+	lcdmsg.info.payload[0]=SUCCESS;
+	pscr->msg(&lcdmsg);
 	return ERR_NONE;
 
+
 lbl_mma8451_config_err:
+	lcdmsg.id=LCD_MSG_ID_MEMS;
+	lcdmsg.info.payload[0]=ERROR;
+	pscr->msg(&lcdmsg);
 	return res;
 }
 

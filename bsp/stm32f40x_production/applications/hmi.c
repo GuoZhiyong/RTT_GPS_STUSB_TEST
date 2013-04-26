@@ -60,6 +60,8 @@ static KEY keys[]={
 static uint8_t iccard_state=0;  /*卡状态 0未插入 1已插入*/
 uint32_t iccard_beep_timeout=0;
 
+uint8_t	ctrlbit_buzzer=0;
+
 /*
 50ms检查一次按键,只是置位对应的键，程序中判断组合键按下
 
@@ -108,8 +110,9 @@ static uint32_t  keycheck(void)
 	
 	for( i = 0; i < sizeof( PIN_IN ) / sizeof( AUX_IO ); i++ )
 	{
-		if(GPIO_ReadInputDataBit( PIN_IN[i].port, PIN_IN[i].pin )==0) j++;
+		if(GPIO_ReadInputDataBit( PIN_IN[i].port, PIN_IN[i].pin )==0) j|=(1<<i);
 	}
+	if(j) rt_kprintf("\r\naux_in=%x",j);
 
 	if(mems_alarm_tick)
 	{
@@ -118,15 +121,15 @@ static uint32_t  keycheck(void)
 	if(iccard_beep_timeout) iccard_beep_timeout--;
 	
 /*合适停止响*/
+	
 	if(tmp_key|j|mems_alarm_tick|iccard_beep_timeout)
 	{
-		GPIO_SetBits(GPIOB,GPIO_Pin_6);
+		ctrlbit_buzzer=0x80;
 	}
 	else
 	{
-		GPIO_ResetBits(GPIOB,GPIO_Pin_6);
+		ctrlbit_buzzer=0;
 	}	
-	
 	return (tmp_key);
 
 }
@@ -144,7 +147,7 @@ static void key_lcd_port_init(void)
 	 RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOE, ENABLE);
 	
 	 GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
-	 GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	 GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
 
 	for(i=0;i<4;i++)
 	{

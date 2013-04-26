@@ -52,6 +52,8 @@ typedef struct IMG_DEF
    This value is the address of the leftmost column: */
 #define LCD_STARTCOL_REVERSE	19
 
+/*蜂鸣器和打印3.3v移到此处*/
+void ControlBitShift( unsigned char data );
 
 
 void lcd_init(void);

@@ -43,6 +43,9 @@ static unsigned char	l_display_array[LCD_Y_BYTES][LCD_X_BYTES];
 #define RW		( 1 << 3 )
 #define A0		( 1 << 4 )
 
+#define BL 		(1<<6)
+
+
 const unsigned char asc_0608[][6] =
 {
 	{ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }, /*" ",0*/
@@ -153,6 +156,9 @@ const unsigned char asc_0608[][6] =
 * Return:
 * Others:
 ***********************************************************/
+extern uint8_t 	ctrlbit_printer_3v3_on;
+extern uint8_t	ctrlbit_buzzer;
+
 void ControlBitShift( unsigned char data )
 {
 	unsigned char i;
@@ -161,6 +167,12 @@ void ControlBitShift( unsigned char data )
 	//IOCLR0 = STCP2;
 	GPIO_SetBits( GPIOE, GPIO_Pin_15 );
 	GPIO_ResetBits( GPIOE, GPIO_Pin_13 );
+
+	if(ctrlbit_buzzer) data|=0x80;
+	else data&=0x7f;
+	if(ctrlbit_printer_3v3_on) data|=0x20;
+	else data&=~0x20;
+		
 
 	for( i = 0; i < 8; i++ )
 	{
@@ -235,7 +247,7 @@ void lcd_out_ctl( const unsigned char cmd, const unsigned char ncontr )
 //  LCD_CMD_MODE();
 //	LCDDATAPORT = cmd;
 
-	ControlBitShift( RST0 | 0x40 );
+	ControlBitShift( RST0 | BL);
 	DataBitShift( cmd );
 	ctr = RST0;
 	if( ncontr & 0x01 )
@@ -246,12 +258,12 @@ void lcd_out_ctl( const unsigned char cmd, const unsigned char ncontr )
 	{
 		ctr |= E2;
 	}
-	ControlBitShift( ctr | 0x40 );
+	ControlBitShift( ctr | BL );
 	//delay(1);
 	for( i = 0; i < 0xf; i++ )
 	{
 	}
-	ControlBitShift( RST0 | 0x40 );
+	ControlBitShift( RST0 | BL);
 }
 
 /*
@@ -269,7 +281,7 @@ void lcd_out_dat( const unsigned char dat, const unsigned char ncontr )
 //   LCDDATAPORT = dat;
 
 	ctr = RST0 | A0;
-	ControlBitShift( ctr | 0x40 );
+	ControlBitShift( ctr | BL );
 	DataBitShift( dat );
 	if( ncontr & 0x01 )
 	{
@@ -279,12 +291,12 @@ void lcd_out_dat( const unsigned char dat, const unsigned char ncontr )
 	{
 		ctr |= E2;
 	}
-	ControlBitShift( ctr | 0x40 );
+	ControlBitShift( ctr |  BL  );
 	//delay(1);
 	for( i = 0; i < 0xf; i++ )
 	{
 	}
-	ControlBitShift( RST0 | A0 | 0x40 );
+	ControlBitShift( RST0 | A0 | BL  );
 }
 
 /*

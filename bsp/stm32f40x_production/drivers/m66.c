@@ -712,13 +712,18 @@ rt_err_t pt_resp_CPIN( char *p, uint16_t len )
 /* +CSQ: 31, 99 */
 rt_err_t pt_resp_CSQ( char *p, uint16_t len )
 {
-	uint32_t i, n, code;
-	i = sscanf( p, "+CSQ%*[^:]:%d,%d", &n, &code );
+	LCD_MSG lcd_msg;
+
+	uint32_t i, n,ber;
+	i = sscanf( p, "+CSQ%*[^:]:%d,%d", &n, &ber );
 	if( i != 2 )
 	{
 		return RT_ERROR;
 	}
 	gsm_param.csq = n;
+	lcd_msg.id		= LCD_MSG_ID_CSQ;
+	lcd_msg.info.payload[0] = n; /*接通*/
+	pscr->msg( (void*)&lcd_msg );
 	return RT_EOK;
 }
 
@@ -888,6 +893,23 @@ static int protothread_gsm_power( struct pt *pt )
 		//GPIO_SetBits(GPIOD,GPIO_Pin_9); /*关功放*/
 		gsm_state = GSM_AT;                             /*切换到AT状态*/
 	}
+	if(gsm_state == GSM_AT)		/*定时查CSQ*/
+	{
+		
+		m66_write( &dev_gsm, 0,"AT+CSQ\r\n" , 8 );
+		rt_kprintf( "%08d gsm_send>%s", rt_tick_get( ), "AT+CSQ\r\n");
+		pt_timer_set( &timer_gsm_power, RT_TICK_PER_SECOND*3);
+		PT_WAIT_UNTIL( pt, pt_timer_expired( &timer_gsm_power ) || ( RT_EOK == pt_resp(pt_resp_CSQ )) );
+		if( pt_timer_expired( &timer_gsm_power ) ) /*超时*/
+		{
+			rt_kprintf( "\r\nAT+CSQ timeout\r\n" );
+		}
+		pt_timer_set( &timer_gsm_power, RT_TICK_PER_SECOND*3);
+		PT_WAIT_UNTIL( pt, pt_timer_expired( &timer_gsm_power ) );
+		
+		
+
+	}
 	if( gsm_state == GSM_POWEROFF )
 	{
 		GPIO_ResetBits( GSM_PWR_PORT, GSM_PWR_PIN );
@@ -951,6 +973,7 @@ static void rt_thread_entry_gsm( void* parameter )
 			}
 		}
 		protothread_gsm_power( &pt_gsm_power );
+		
 
 		rt_thread_delay( RT_TICK_PER_SECOND / 20 );
 	}

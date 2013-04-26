@@ -115,6 +115,23 @@ DECL_BMP( 24, 8, res_iccard_insert );
 
 
 
+const unsigned char res_iccard_err[]={
+0x00,0x00,0x00,
+0x08,0x92,0x44,
+0x11,0x24,0x88,
+0x22,0x49,0x10,
+0x44,0x92,0x20,
+0xff,0xff,0xc0,
+0x00,0x00,0x00,
+0x00,0x00,0x00,
+};
+
+DECL_BMP( 24, 8, res_iccard_err );
+
+
+
+
+
 static char cam_ch[4]={0x20,0x20,0x20,0x20};
 
 
@@ -348,14 +365,20 @@ static void showinfo(void)
 		lcd_asc0608( 0, 8, buf, LCD_MODE_SET );
 	}
 
-	if(card_status==1)
+	if(card_status==IC_READ_OK)
 	{
 		lcd_bitmap( 122 - 6*4, 24, &bmp_res_iccard_insert, LCD_MODE_SET );
 	}
-	else
+	else if(card_status==IC_PLUG_OUT)
 	{
 		lcd_bitmap( 122 - 6*4, 24, &bmp_res_iccard_empty, LCD_MODE_SET );
 	}
+	else if(card_status==IC_READ_ERR)
+	{
+		lcd_bitmap( 122 - 6*4, 24, &bmp_res_iccard_err, LCD_MODE_SET );
+	}
+
+	
 	if(rtc_ok)
 	{
 		lcd_asc0608( 0, 24, "RTC", LCD_MODE_SET );
@@ -603,6 +626,46 @@ static void msg( void *plcdmsg )
 	{
 		iccard_beep_timeout=10;
 		card_status=plcd_msg->info.payload[0];
+		if(card_status==IC_PLUG_OUT)
+		{
+			i=sprintf(buf,"AT%%TTS=2,3,5,\"4943BFA8B0CEB3F6\"\r\n\0");/*IC¿¨°Î³ö*/
+			pmsg=rt_malloc(i);
+			if(pmsg!=RT_NULL)
+			{
+				memcpy(pmsg,buf,i);
+				rt_mb_send(&mb_tts,(rt_uint32_t)pmsg);
+			}
+		}
+		if(card_status==IC_READ_OK)
+		{
+			i=sprintf(buf,"AT%%TTS=2,3,5,\"4943BFA8D5FDB3A3\"\r\n\0"); /*IC¿¨Õý³£*/
+			pmsg=rt_malloc(i);
+			if(pmsg!=RT_NULL)
+			{
+				memcpy(pmsg,buf,i);
+				rt_mb_send(&mb_tts,(rt_uint32_t)pmsg);
+			}
+		}
+		
+		if(card_status==IC_READ_OK)
+		{
+			i=sprintf(buf,"AT%%TTS=2,3,5,\"4943BFA8B4EDCEF3\"\r\n\0"); /*IC¿¨´íÎó*/
+			pmsg=rt_malloc(i);
+			if(pmsg!=RT_NULL)
+			{
+				memcpy(pmsg,buf,i);
+				rt_mb_send(&mb_tts,(rt_uint32_t)pmsg);
+			}
+		}
+
+
+
+
+
+		
+
+
+		
 		test_flag|=TEST_BIT_ICCARD;
 	}
 

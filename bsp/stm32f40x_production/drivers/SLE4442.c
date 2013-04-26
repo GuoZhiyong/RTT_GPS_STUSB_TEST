@@ -731,26 +731,17 @@ void CheckICCard( void )
 				{	
 					IC_Card_Checked=1;
 					lcdmsg.id=LCD_MSG_ID_ICCARD;
-					lcdmsg.info.payload[0]=1; 
+					lcdmsg.info.payload[0]=IC_READ_OK; 
 					pscr->msg(&lcdmsg);
-					i=sprintf(buf,"AT%%TTS=2,3,5,\"4943BFA8D5FDB3A3\"\r\n"); /*IC¿¨Õý³£*/
+					
 				}
 				else
 				{
 					IC_Card_Checked=1;
 					lcdmsg.id=LCD_MSG_ID_ICCARD;
-					lcdmsg.info.payload[0]=2; 
+					lcdmsg.info.payload[0]=IC_READ_ERR; 
 					pscr->msg(&lcdmsg);
-					i=sprintf(buf,"AT%%TTS=2,3,5,\"4943BFA8B4EDCEF3\"\r\n"); /*IC¿¨´íÎó*/
 				}
-				buf[i]=0;
-				rt_kprintf("\r\nICCARD(%d)\r\n",i);
-				pmsg=rt_malloc(i+1);
-				if(pmsg!=RT_NULL)
-				{
-					memcpy(pmsg,buf,i+1);
-					rt_mb_send(&mb_tts,(rt_uint32_t)pmsg);
-				}	
 			}
 		}
 	}else
@@ -763,16 +754,8 @@ void CheckICCard( void )
 		if(IC_Card_Checked==1)
 		{
 			lcdmsg.id=LCD_MSG_ID_ICCARD;
-			lcdmsg.info.payload[0]=0; 
+			lcdmsg.info.payload[0]=IC_PLUG_OUT; 
 			pscr->msg(&lcdmsg);
-			i=sprintf(buf,"AT%%TTS=2,3,5,\"4943BFA8B0CEB3F6\"\r\n\0");
-			pmsg=rt_malloc(i);
-			if(pmsg!=RT_NULL)
-			{
-				memcpy(pmsg,buf,i);
-				rt_mb_send(&mb_tts,(rt_uint32_t)pmsg);
-			}	
-
 		}	
 		IC_Card_Checked=0;
 	}

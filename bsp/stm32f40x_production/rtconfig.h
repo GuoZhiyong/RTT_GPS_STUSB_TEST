@@ -39,7 +39,7 @@
 #define IDLE_THREAD_STACK_SIZE     512
 
 /* Using Software Timer */
-#define RT_USING_TIMER_SOFT
+//#define RT_USING_TIMER_SOFT
 #define RT_TIMER_THREAD_PRIO		4
 #define RT_TIMER_THREAD_STACK_SIZE	512
 #define RT_TIMER_TICK_PER_SECOND	10
@@ -52,7 +52,7 @@
 #define RT_USING_MUTEX
 
 /* Using Event */
-#define RT_USING_EVENT
+//#define RT_USING_EVENT
 
 /* Using MailBox */
 #define RT_USING_MAILBOX

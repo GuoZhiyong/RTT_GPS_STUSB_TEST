@@ -209,7 +209,7 @@ void gps_baud( int baud )
 	USART_Init( UART5, &USART_InitStructure );
 }
 
-FINSH_FUNCTION_EXPORT( gps_baud, config gsp_baud );
+//FINSH_FUNCTION_EXPORT( gps_baud, config gsp_baud );
 
 /*≥ı ºªØ*/
 static rt_err_t dev_gps_init( rt_device_t dev )

@@ -91,6 +91,7 @@ void rtthread_startup(void)
 	
 	/* init application */
 	sst25_init(); /*在此初始化,gsm才能读取参数，放在app_thread中不会先执行*/
+	//df_test();
 	rt_application_init();
 	gps_init();
 	gsm_init();

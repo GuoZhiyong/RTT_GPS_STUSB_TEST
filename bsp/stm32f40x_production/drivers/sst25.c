@@ -419,6 +419,7 @@ int df_read(uint32_t addr,uint16_t size )
 
 
 #if 0
+#include <rtthread.h>
 uint8_t df_test(void)
 {
 	uint32_t i,j,count;
@@ -431,13 +432,13 @@ uint8_t df_test(void)
 	if(p==RT_NULL) return 0;
 
 
-	printf("%d>%d\r\n",rt_tick_get(),__LINE__);
+	rt_kprintf("%d>%d\r\n",rt_tick_get(),__LINE__);
 /*ÕûÆ¬²ë³ý*/
 	for(i=0;i<10000;i+=4096)
 	{
 		sst25_erase_4k(i);
 	}
-	printf("%d>%d\r\n",rt_tick_get(),__LINE__); 
+	rt_kprintf("%d>%d\r\n",rt_tick_get(),__LINE__); 
 /*Ö±Ð´*/
 	pdata=p;
 	for(i=0;i<100;i++) buf[i]=i;
@@ -445,7 +446,8 @@ uint8_t df_test(void)
 	{
 		sst25_write_through(i,buf,100);
 	}
-	printf("%d>%d\r\n",rt_tick_get(),__LINE__); 
+	rt_kprintf("%d>%d\r\n",rt_tick_get(),__LINE__); 
+	
 /*ÅÐ¶Ï*/	
 	for(i=0;i<10000;i+=100)
 	{
@@ -454,13 +456,13 @@ uint8_t df_test(void)
 		{
 			if(*(p+j)!=buf[j])
 			{
-				printf("%d>err i=0x%08x j=%d\r\n",rt_tick_get(),i,j);
+				rt_kprintf("%d>err i=0x%08x j=%d\r\n",rt_tick_get(),i,j);
 				break;
 			}
 		}	
 	}
 
-	printf("%d>%d\r\n",rt_tick_get(),__LINE__); 
+	rt_kprintf("%d>%d\r\n",rt_tick_get(),__LINE__); 
 	rt_free(p);
 
 }

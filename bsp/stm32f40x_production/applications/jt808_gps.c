@@ -15,7 +15,7 @@
 
 #include <board.h>
 #include <rtthread.h>
-#include <finsh.h>
+//#include <finsh.h>
 
 #include "stm32f4xx.h"
 #include "scr.h"

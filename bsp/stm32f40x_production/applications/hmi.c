@@ -70,6 +70,9 @@ uint8_t	ctrlbit_buzzer=0;
 
 extern AUX_IO	PIN_IN[10];
 
+
+uint32_t aux_io_status=0;
+
 static uint32_t  keycheck(void)
 {
 	int i,j;
@@ -112,7 +115,11 @@ static uint32_t  keycheck(void)
 	{
 		if(GPIO_ReadInputDataBit( PIN_IN[i].port, PIN_IN[i].pin )==0) j|=(1<<i);
 	}
-	if(j) rt_kprintf("\r\naux_in=%x",j);
+	if(j^aux_io_status)
+	{
+		rt_kprintf("\r\naux_in=%x",j);
+		aux_io_status=j;
+	}	
 
 	if(mems_alarm_tick)
 	{
@@ -124,11 +131,13 @@ static uint32_t  keycheck(void)
 	
 	if(tmp_key|j|mems_alarm_tick|iccard_beep_timeout)
 	{
-		ctrlbit_buzzer=0x80;
+		//ctrlbit_buzzer=0x80;
+		GPIO_SetBits(GPIOB,GPIO_Pin_6);
 	}
 	else
 	{
-		ctrlbit_buzzer=0;
+		//ctrlbit_buzzer=0;
+		GPIO_ResetBits(GPIOB,GPIO_Pin_6);
 	}	
 	return (tmp_key);
 

@@ -20,14 +20,14 @@ typedef void (*MSG)(void *pmsg);
 #define LCD_MSG_ID_ICCARD	0x0007
 #define LCD_MSG_ID_CSQ	0x0008
 
-enum
+enum ICCARD_STATUS
 {
 	IC_IDLE=0,
 	IC_INIT_ERR=1,
 	IC_READ_OK=2,
 	IC_READ_ERR=3,
 	IC_PLUG_OUT=4
-}ICCARD_STATUS;
+};
 
 
 

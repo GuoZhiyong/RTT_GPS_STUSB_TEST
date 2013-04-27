@@ -710,12 +710,21 @@ rt_err_t pt_resp_CPIN( char *p, uint16_t len )
 }
 
 /* +CSQ: 31, 99 */
+/*M66 +CSQ: 13,99*/
+/*    +CSQ: 15,99*/
+
+
 rt_err_t pt_resp_CSQ( char *p, uint16_t len )
 {
 	LCD_MSG lcd_msg;
-
-	uint32_t i, n,ber;
-	i = sscanf( p, "+CSQ%*[^:]:%d,%d", &n, &ber );
+	char *pstr;
+	uint32_t i, n=0,ber=0;
+	
+	pstr=strstr(p,"+CSQ");
+	if(pstr==(char*)0) return RT_ERROR;
+	rt_kprintf("\r\nRX STR=%s",pstr);
+	i = sscanf( pstr, "%*[^ ] %d,%d", &n, &ber );
+	
 	if( i != 2 )
 	{
 		return RT_ERROR;

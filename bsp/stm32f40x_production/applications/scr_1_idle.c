@@ -501,12 +501,13 @@ static void timetick( unsigned int systick )
 	uint8_t			i,j;
 	void * pmsg;
 /*发生状态改变*/
+#ifdef bitter
 	if((ctrlbit_printer_3v3_on|ctrlbit_buzzer)^ctrlbit_status)
 	{
 		showinfo();
 		ctrlbit_status=(ctrlbit_printer_3v3_on|ctrlbit_buzzer);
 	}
-	
+#endif	
 
 	offset++;
 	if( offset >= 20 )
@@ -657,15 +658,6 @@ static void msg( void *plcdmsg )
 				rt_mb_send(&mb_tts,(rt_uint32_t)pmsg);
 			}
 		}
-
-
-
-
-
-		
-
-
-		
 		test_flag|=TEST_BIT_ICCARD;
 	}
 
@@ -695,6 +687,7 @@ static void msg( void *plcdmsg )
 
 	if(plcd_msg->id == LCD_MSG_ID_CSQ)
 	{
+		rt_kprintf("\r\ncsq=%d",plcd_msg->info.payload[0]);
 		if(plcd_msg->info.payload[0]<gsm_csq)
 		{
 			gsm_csq=plcd_msg->info.payload[0];

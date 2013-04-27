@@ -373,13 +373,13 @@ static void showinfo(void)
 	{
 		lcd_bitmap( 122 - 6*4, 24, &bmp_res_iccard_insert, LCD_MODE_SET );
 	}
-	else if(card_status==IC_PLUG_OUT)
-	{
-		lcd_bitmap( 122 - 6*4, 24, &bmp_res_iccard_empty, LCD_MODE_SET );
-	}
 	else if(card_status==IC_READ_ERR)
 	{
 		lcd_bitmap( 122 - 6*4, 24, &bmp_res_iccard_err, LCD_MODE_SET );
+	}
+	else
+	{
+		lcd_bitmap( 122 - 6*4, 24, &bmp_res_iccard_empty, LCD_MODE_SET );
 	}
 
 	

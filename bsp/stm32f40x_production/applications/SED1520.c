@@ -168,10 +168,10 @@ void ControlBitShift( unsigned char data )
 	GPIO_SetBits( GPIOE, GPIO_Pin_15 );
 	GPIO_ResetBits( GPIOE, GPIO_Pin_13 );
 
-	//if(ctrlbit_buzzer) data|=0x80;
-	//else data&=0x7f;
-	//if(ctrlbit_printer_3v3_on) data|=0x20;
-	//else data&=~0x20;
+	if(ctrlbit_buzzer) data|=0x80;
+	else data&=0x7f;
+	if(ctrlbit_printer_3v3_on) data|=0x20;
+	else data&=~0x20;
 		
 
 	for( i = 0; i < 8; i++ )

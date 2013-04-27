@@ -131,13 +131,13 @@ static uint32_t  keycheck(void)
 	
 	if(tmp_key|j|mems_alarm_tick|iccard_beep_timeout)
 	{
-		//ctrlbit_buzzer=0x80;
-		GPIO_SetBits(GPIOB,GPIO_Pin_6);
+		ctrlbit_buzzer=0x80;
+		//GPIO_SetBits(GPIOB,GPIO_Pin_6);
 	}
 	else
 	{
-		//ctrlbit_buzzer=0;
-		GPIO_ResetBits(GPIOB,GPIO_Pin_6);
+		ctrlbit_buzzer=0;
+		//GPIO_ResetBits(GPIOB,GPIO_Pin_6);
 	}	
 	return (tmp_key);
 

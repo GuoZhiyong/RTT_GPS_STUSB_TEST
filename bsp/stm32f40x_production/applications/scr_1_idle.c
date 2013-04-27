@@ -507,13 +507,11 @@ static void timetick( unsigned int systick )
 	uint8_t			i,j;
 	void * pmsg;
 /*发生状态改变*/
-#ifdef bitter
 	if((ctrlbit_printer_3v3_on|ctrlbit_buzzer)^ctrlbit_status)
 	{
 		showinfo();
 		ctrlbit_status=(ctrlbit_printer_3v3_on|ctrlbit_buzzer);
 	}
-#endif	
 
 	offset++;
 	if( offset >= 20 )

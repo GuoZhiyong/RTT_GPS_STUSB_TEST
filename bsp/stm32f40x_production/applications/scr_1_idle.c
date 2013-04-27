@@ -148,7 +148,11 @@ uint16_t ADC_ConValue[3];   //   3  个通道ID    0 : 电池 1: 灰线   2:  绿线
 static uint32_t gps_fixed_sec = 0;
 static uint8_t card_status=0;
 static uint32_t rtc_ok=0;
+
+static uint8_t	gsm_csq_min=0xff;
 static uint8_t	gsm_csq=0xff;
+static uint8_t	gsm_csq_max=0x0;
+
 static uint32_t gprs_ok_past_sec=0;
 static uint8_t	mems_status=ERROR;
 
@@ -358,7 +362,7 @@ static void showinfo(void)
 {
 	char buf[32];
 
-	lcd_asc0608(122-6*6,0,"041813",LCD_MODE_INVERT);
+	lcd_asc0608(122-6*6,0,"042710",LCD_MODE_INVERT);
 	if( gps_fixed_sec )
 	{
 		sprintf( buf, "%02d:%02d", gps_fixed_sec / 60, gps_fixed_sec % 60 );
@@ -386,13 +390,15 @@ static void showinfo(void)
 	
 	if(gsm_csq!=0xff)
 	{
-		sprintf(buf,"csq:%02d",gsm_csq);
-		lcd_asc0608(122-6*8,16,buf,LCD_MODE_SET);
+		if(gsm_csq_min>gsm_csq) gsm_csq_min=gsm_csq;
+		if(gsm_csq_max<gsm_csq) gsm_csq_max=gsm_csq;
+		sprintf(buf,"%02d[%02d-%02d]",gsm_csq,gsm_csq_min,gsm_csq_max);
+		lcd_asc0608(122-6*9,16,buf,LCD_MODE_SET);
 	}
 
 	if(gprs_ok_past_sec)
 	{
-		sprintf( buf, "%02d:%02d  GPRS",gprs_ok_past_sec/60,gprs_ok_past_sec%60);
+		sprintf( buf, "%02d:%02d GPRS",gprs_ok_past_sec/60,gprs_ok_past_sec%60);
 		lcd_asc0608( 0,16, buf, LCD_MODE_SET );
 	}
 	if(mems_status==SUCCESS)
@@ -687,11 +693,9 @@ static void msg( void *plcdmsg )
 
 	if(plcd_msg->id == LCD_MSG_ID_CSQ)
 	{
-		rt_kprintf("\r\ncsq=%d",plcd_msg->info.payload[0]);
-		if(plcd_msg->info.payload[0]<gsm_csq)
-		{
-			gsm_csq=plcd_msg->info.payload[0];
-		}
+		gsm_csq=plcd_msg->info.payload[0];
+		rt_kprintf("\r\ncsq=%d",gsm_csq);
+
 	}
 
 	if(test_flag==TEST_BIT_ALL)

@@ -722,7 +722,6 @@ rt_err_t pt_resp_CSQ( char *p, uint16_t len )
 	
 	pstr=strstr(p,"+CSQ");
 	if(pstr==(char*)0) return RT_ERROR;
-	rt_kprintf("\r\nRX STR=%s",pstr);
 	i = sscanf( pstr, "%*[^ ] %d,%d", &n, &ber );
 	
 	if( i != 2 )
@@ -929,7 +928,7 @@ static int protothread_gsm_power( struct pt *pt )
 }
 
 ALIGN( RT_ALIGN_SIZE )
-static char thread_gsm_stack[512];
+static char thread_gsm_stack[1024];
 struct rt_thread thread_gsm;
 
 

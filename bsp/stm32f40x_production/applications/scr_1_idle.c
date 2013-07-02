@@ -614,7 +614,7 @@ static void msg( void *plcdmsg )
 		{
 			i=sprintf(buf,"AT%%TTS=2,3,5,\"C5C4D5D5%02xD5FDB3A3\"\r\n",ch+0x30);
 			cam_ch[ch-1]=0x30+ch;
-			lcd_asc0608( 122 - 6*4, 16, cam_ch, LCD_MODE_SET );
+			lcd_asc0608( 122 - 6*8-4, 24, cam_ch, LCD_MODE_SET );
 		}
 		else
 		{
@@ -654,7 +654,7 @@ static void msg( void *plcdmsg )
 			}
 		}
 		
-		if(card_status==IC_READ_OK)
+		if(card_status==IC_READ_ERR)
 		{
 			i=sprintf(buf,"AT%%TTS=2,3,5,\"4943BFA8B4EDCEF3\"\r\n\0"); /*IC¿¨´íÎó*/
 			pmsg=rt_malloc(i);

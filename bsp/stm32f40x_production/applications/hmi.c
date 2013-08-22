@@ -17,7 +17,7 @@
 #include "stm32f4xx.h"
 #include <board.h>
 #include <rtthread.h>
-
+#include <finsh.h>
 #include "scr.h"
 #include "gsm.h"
 #include "sle4442.h"
@@ -104,10 +104,10 @@ static uint32_t  keycheck(void)
 
 	tmp_key=keys[0].status|keys[1].status|keys[2].status|keys[3].status;
 	
-	if(tmp_key)
-	{
-		rt_kprintf("%04x\r\n",tmp_key);
-	}
+//	if(tmp_key)
+//	{
+//		rt_kprintf("%04x\r\n",tmp_key);
+//	}
 	
 	j=0;
 	
@@ -131,12 +131,13 @@ static uint32_t  keycheck(void)
 	
 	if(tmp_key|j|mems_alarm_tick|iccard_beep_timeout)
 	{
-		ctrlbit_buzzer=0x80;
+		
+		//ctrlbit_buzzer=0x80;
 		//GPIO_SetBits(GPIOB,GPIO_Pin_6);
 	}
 	else
 	{
-		ctrlbit_buzzer=0;
+		//ctrlbit_buzzer=0;
 		//GPIO_ResetBits(GPIOB,GPIO_Pin_6);
 	}	
 	return (tmp_key);
@@ -195,7 +196,7 @@ static void rt_thread_entry_hmi( void* parameter )
 	lcd_init();
 	gsmstate(GSM_POWERON);
 
-	pscr = &scr_1_idle;
+	pscr = &scr_0_lcd_key;
 	pscr->show(NULL);
 
 	Init_4442();
@@ -230,5 +231,23 @@ void hmi_init( void )
 	                sizeof( thread_hmi_stack ), 17, 5 );
 	rt_thread_startup( &thread_hmi );
 }
+
+
+
+void reset( unsigned int reason )
+{
+/*没有发送的数据要保存*/
+
+/*关闭连接*/
+
+/*日志记录时刻重启原因*/
+
+	rt_kprintf( "\n%08d reset>reason=%08x", rt_tick_get( ), reason );
+/*执行重启*/
+	rt_thread_delay( RT_TICK_PER_SECOND * 3 );
+	NVIC_SystemReset( );
+}
+
+FINSH_FUNCTION_EXPORT( reset, restart device );
 
 /************************************** The End Of File **************************************/

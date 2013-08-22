@@ -1,6 +1,7 @@
 #ifndef _GPS_H_
 #define _GPS_H_
 
+
 #define CTL_GPS_BAUD	0x30
 #define CTL_GPS_OUTMODE	0x31	/*gps信息的输出模式*/
 
@@ -20,7 +21,7 @@
 
 
 */
-
+#if 1
 
 #define BDUPG_RES_UART_OK		(0x10000000)	/*没有错误升级成功-升级成功*/
 #define BDUPG_RES_UART_READY	(0x1000FFFF)	/*串口更新就绪*/
@@ -45,14 +46,15 @@
 #define BDUPG_RES_TIMEOUT	(0xFFFFFFFC)	/*超时失败*/
 
 
+#endif
 
 
 
-
-
-
-void thread_gps_upgrade_uart( void* parameter );
+void thread_gps_check_ver( void* parameter );
 void thread_gps_upgrade_udisk( void* parameter );
+
+rt_size_t gps_mode( uint8_t mode );
+void gps_init( void );
 
 
 #endif

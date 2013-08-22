@@ -632,6 +632,108 @@ void lcd_asc0608( char left, char top, char *p, const char mode )
 	}
 }
 
+
+
+/*
+   绘制12点阵的字符，包括中文和英文
+*/
+void lcd_text12( char left, char top, char *pinfo, char len, const char mode )
+{
+	int				charnum = len;
+	int				i;
+	char			msb, lsb;
+
+	int				addr		= 0;
+	unsigned char	start_col	= left;
+	unsigned int	val_old, val_new, val_mask;
+
+	unsigned int	glyph[12]; /*保存一个字符的点阵信息，以逐列式*/
+	uint8_t			*p = pinfo;
+
+	while( charnum )
+	{
+		for( i = 0; i < 12; i++ )
+		{
+			glyph[i] = 0;
+		}
+		msb = *p++;
+		charnum--;
+		if( msb <= 0x80 ) //ascii字符 0612
+		{
+			addr = ( msb - 0x20 ) * 12 + FONT_ASC0612_ADDR;
+			for( i = 0; i < 3; i++ )
+			{
+				val_new				= *(__IO uint32_t*)addr;
+				glyph[i * 2 + 0]	= ( val_new & 0xffff );
+				glyph[i * 2 + 1]	= ( val_new & 0xffff0000 ) >> 16;
+				addr				+= 4;
+			}
+
+			val_mask = ( ( 0xfff ) << top ); /*12bit*/
+
+			/*加上top的偏移*/
+			for( i = 0; i < 6; i++ )
+			{
+				glyph[i] <<= top;
+
+				val_old = l_display_array[0][start_col] | ( l_display_array[1][start_col] << 8 ) | ( l_display_array[2][start_col] << 16 ) | ( l_display_array[3][start_col] << 24 );
+				if( mode == LCD_MODE_SET )
+				{
+					val_new = val_old & ( ~val_mask ) | glyph[i];
+				}else if( mode == LCD_MODE_INVERT )
+				{
+					val_new = ( val_old | val_mask ) & ( ~glyph[i] );
+				}
+				l_display_array[0][start_col]	= val_new & 0xff;
+				l_display_array[1][start_col]	= ( val_new & 0xff00 ) >> 8;
+				l_display_array[2][start_col]	= ( val_new & 0xff0000 ) >> 16;
+				l_display_array[3][start_col]	= ( val_new & 0xff000000 ) >> 24;
+				start_col++;
+			}
+		}else
+		{
+			lsb = *p++;
+			charnum--;
+			if( ( msb >= 0xa1 ) && ( msb <= 0xa3 ) && ( lsb >= 0xa1 ) )
+			{
+				addr = FONT_HZ1212_ADDR + ( ( ( (unsigned long)msb ) - 0xa1 ) * 94 + ( ( (unsigned long)lsb ) - 0xa1 ) ) * 24;
+			}else if( ( msb >= 0xb0 ) && ( msb <= 0xf7 ) && ( lsb >= 0xa1 ) )
+			{
+				addr = FONT_HZ1212_ADDR + ( ( ( (unsigned long)msb ) - 0xb0 ) * 94 + ( ( (unsigned long)lsb ) - 0xa1 ) ) * 24 + 282 * 24;
+			}
+			for( i = 0; i < 6; i++ )
+			{
+				val_new				= *(__IO uint32_t*)addr;
+				glyph[i * 2 + 0]	= ( val_new & 0xffff );
+				glyph[i * 2 + 1]	= ( val_new & 0xffff0000 ) >> 16;
+				addr				+= 4;
+			}
+			val_mask = ( ( 0xfff ) << top ); /*12bit*/
+
+			/*加上top的偏移*/
+			for( i = 0; i < 12; i++ )
+			{
+				glyph[i] <<= top;
+				/*通过start_col映射到I_display_array中，注意mask*/
+				val_old = l_display_array[0][start_col] | ( l_display_array[1][start_col] << 8 ) | ( l_display_array[2][start_col] << 16 ) | ( l_display_array[3][start_col] << 24 );
+				if( mode == LCD_MODE_SET )
+				{
+					val_new = val_old & ( ~val_mask ) | glyph[i];
+				}else if( mode == LCD_MODE_INVERT )
+				{
+					val_new = ( val_old | val_mask ) & ( ~glyph[i] );
+				}
+				l_display_array[0][start_col]	= val_new & 0xff;
+				l_display_array[1][start_col]	= ( val_new & 0xff00 ) >> 8;
+				l_display_array[2][start_col]	= ( val_new & 0xff0000 ) >> 16;
+				l_display_array[3][start_col]	= ( val_new & 0xff000000 ) >> 24;
+				start_col++;
+			}
+		}
+	}
+}
+
+
 /*水平线,要保留原来的值*/
 void lcd_hline(uint8_t from,uint8_t to ,uint8_t line)
 {

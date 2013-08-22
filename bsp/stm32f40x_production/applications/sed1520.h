@@ -48,6 +48,21 @@ typedef struct IMG_DEF
 #define SCRN_RIGHT		121
 #define SCRN_BOTTOM		31
 
+
+
+#define FONT_BASE_ADDR		0x08040000
+
+#define FONT_ASC0612_SIZE	0x480
+#define FONT_HZ1212_SIZE	0x294F0
+#define FONT_ASC1224_SIZE	0x1200
+#define FONT_HZ2424_SIZE	0x7bed0
+#define FONT_ASC0612_ADDR	(FONT_BASE_ADDR)
+#define FONT_HZ1212_ADDR	(FONT_BASE_ADDR+FONT_ASC0612_SIZE)
+#define FONT_ASC1224_ADDR	(FONT_BASE_ADDR+FONT_ASC0612_SIZE+FONT_HZ1212_SIZE)
+#define FONT_HZ2424_ADDR	(FONT_BASE_ADDR+FONT_ASC0612_SIZE+FONT_HZ1212_SIZE+FONT_ASC1224_SIZE)
+
+
+
 /* SED1520 is used with reverse direction (ADC_REV). 
    This value is the address of the leftmost column: */
 #define LCD_STARTCOL_REVERSE	19
@@ -60,6 +75,8 @@ void lcd_init(void);
 void lcd_fill( const unsigned char pattern );
 void lcd_update(const unsigned char top, const unsigned char bottom);
 void lcd_asc0608( char left, char top, char *p,const char mode );
+void lcd_text12( char left, char top, char *pinfo, char len, const char mode );
+
 void lcd_bitmap(const uint8_t left, const uint8_t top, const struct IMG_DEF *img_ptr, const uint8_t mode);
 void lcd_clear( const unsigned char top, const unsigned char bottom );
 

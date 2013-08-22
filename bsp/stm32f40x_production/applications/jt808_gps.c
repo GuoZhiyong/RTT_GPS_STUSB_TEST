@@ -19,7 +19,7 @@
 
 #include "stm32f4xx.h"
 #include "scr.h"
-
+#include "jt808_gps.h"
 
 /*
    $GNRMC,074001.00,A,3905.291037,N,11733.138255,E,0.1,,171212,,,A*655220.9*3F0E
@@ -36,6 +36,12 @@
  */
 
 static LCD_MSG lcd_msg;
+
+uint32_t gps_sec_count=0;
+
+uint32_t gps_fixed_sec;
+GPS_STATUS	gps_status;
+uint32_t jt808_alarm=0;
 
 
 /**/
@@ -258,9 +264,76 @@ uint8_t process_rmc( uint8_t * pinfo )
 * Return:
 * Others:
 ***********************************************************/
-void process_gga( uint8_t * pinfo )
+uint8_t process_gga( uint8_t * pinfo )
 {
+	//检查数据完整性,执行数据转换
+	uint8_t		NoSV;
+	uint8_t		i;
+	uint8_t		buf[20];
+	uint8_t		commacount	= 0, count = 0;
+	uint8_t		*psrc		= pinfo + 7; //指向开始位置
+
+	while( *psrc++ )
+	{
+		if( *psrc != ',' )
+		{
+			buf[count++]	= *psrc;
+			buf[count]		= 0;
+			continue;
+		}
+		commacount++;
+		switch( commacount )
+		{
+			case 1: /*时间处理 */
+				if( count < 6 )
+				{
+					return 1;
+				}
+				break;
+
+			case 2: /*纬度处理ddmm.mmmmmm*/
+				break;
+
+			case 3: /*N_S处理*/
+				break;
+
+			case 4: /*经度处理*/
+
+				break;
+			case 5: /*E_W处理*/
+				break;
+			case 6: /*定位类型*/
+				break;
+			case 7: /*NoSV,卫星数*/
+				if( count < 1 )
+				{
+					break;
+				}
+				NoSV = 0;
+				for( i = 0; i < count; i++ )
+				{
+					NoSV	= NoSV * 10;
+					NoSV	+= ( buf[i] - 0x30 );
+				}
+				gps_status.NoSV = NoSV;
+				break;
+			case 8: /*HDOP*/
+				return 0;
+
+			case 9: /*MSL Altitute*/
+
+				return 0;
+		}
+		count	= 0;
+		buf[0]	= 0;
+	}
+	return 9;
 }
+
+
+
+
+
 
 /***********************************************************
 * Function:
@@ -271,18 +344,43 @@ void process_gga( uint8_t * pinfo )
 * Return:
 * Others:
 ***********************************************************/
-void gps_analy( uint8_t * pinfo )
+void gps_rx( uint8_t * pinfo, uint16_t length )
 {
-	uint16_t	len;
-	uint8_t		* psrc=pinfo;
-	if( ( strncmp( psrc, "$GNRMC,", 7 ) == 0 ) || ( strncmp( psrc, "$BDRMC,", 7 ) == 0 ) || ( strncmp( psrc, "$GPRMC,", 7 ) == 0 ) )
+	uint8_t ret;
+	char	* psrc;
+	psrc = (char*)pinfo;
+
+	*( psrc + length ) = 0;
+
+	if( strncmp( psrc + 3, "GGA,", 4 ) == 0 )
 	{
-		process_rmc( psrc );
+		if( strncmp( psrc + 1, "GN", 2 ) == 0 )
+		{
+			gps_status.mode = MODE_BDGPS;
+		}else if( strncmp( psrc + 1, "GP", 2 ) == 0 )
+		{
+			gps_status.mode = MODE_GPS;
+		}else if( strncmp( psrc + 1, "BD", 2 ) == 0 )
+		{
+			gps_status.mode = MODE_BD;
+		}
+		process_gga( (uint8_t*)psrc );
 	}
-	if( ( strncmp( psrc, "$GNGGA,", 7 ) == 0 ) || ( strncmp( psrc, "$BDGGA,", 7 ) == 0 ) || ( strncmp( psrc, "$GPGGA,", 7 ) == 0 ) )
+
+	if( strncmp( psrc + 3, "RMC,", 4 ) == 0 )
 	{
-		process_gga( psrc );
+		gps_sec_count++;
+		ret = process_rmc( (uint8_t*)psrc );
+
+		if( ret == 0 )                          /*已定位*/
+		{
+			if( gps_fixed_sec == 0 )
+			{
+				gps_fixed_sec = gps_sec_count;
+			}
+		}
 	}
 }
+
 
 /************************************** The End Of File **************************************/

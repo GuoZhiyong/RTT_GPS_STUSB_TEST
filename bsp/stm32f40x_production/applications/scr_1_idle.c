@@ -14,8 +14,10 @@
 #include "scr.h"
 #include <rtthread.h>
 #include "gsm.h"
+#include <string.h>
+#include <stdio.h>
 
-
+#include "jt808_gps.h"
 
 AUX_IO				PIN_IN[10] = {
 	{ GPIOE, GPIO_Pin_8,  78,  19 },    /*紧急按钮*/
@@ -32,7 +34,7 @@ AUX_IO				PIN_IN[10] = {
 
 AUX_IO				PIN_OUT[] = {
 	{ GPIOB, GPIO_Pin_1, 0, 0 },        /*继电器*/
-	{ GPIOB, GPIO_Pin_6, 0, 0 },        /*蜂鸣器*/
+	//{ GPIOB, GPIO_Pin_6, 0, 0 },        /*蜂鸣器*/
 };
 
 const unsigned char res_cross[] = {
@@ -145,7 +147,7 @@ uint16_t ADC_ConValue[3];   //   3  个通道ID    0 : 电池 1: 灰线   2:  绿线
 /*要显示的状态信息*/
 
 /*首次定位的时刻*/
-static uint32_t gps_fixed_sec = 0;
+
 static uint8_t card_status=0;
 static uint32_t rtc_ok=0;
 
@@ -466,7 +468,7 @@ static void keypress( unsigned int key )
 		case KEY_UP_PRESS:		/*拍照*/
 			break;
 		case KEY_DOWN_PRESS:    /*打印测试*/
-			GPIO_ResetBits(GPIOB,GPIO_Pin_6);
+			//GPIO_ResetBits(GPIOB,GPIO_Pin_6);
 		
 			printer( "车牌号码:\r\n车牌分类:\r\n车辆VIN:\r\n驾驶员姓名:\r\n驾驶证代码:\r\n" );
 			

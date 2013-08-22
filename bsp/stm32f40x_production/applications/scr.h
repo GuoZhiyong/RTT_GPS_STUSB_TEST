@@ -115,6 +115,7 @@ typedef struct _aux_io
 
 /*ÓÃµ½µÄscr*/
 extern PSCR pscr;
+extern SCR scr_0_lcd_key;
 extern SCR scr_1_idle;
 extern SCR scr_2_call;
 

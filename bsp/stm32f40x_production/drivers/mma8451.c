@@ -622,6 +622,7 @@ void EXTI9_5_IRQHandler( void )
 		if((value2&0x7F)<0x40)	/*有倾斜发生  0x8x 倾斜发生*/
 		{
 			mems_alarm_tick=10;	
+			//rt_kprintf("\nv=%02x",value2);
 		}
 		else					/*0xcx 倾斜还原*/
 		{

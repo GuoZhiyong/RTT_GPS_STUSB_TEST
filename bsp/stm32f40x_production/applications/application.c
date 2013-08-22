@@ -32,6 +32,11 @@ void rt_init_thread_entry(void* parameter)
 	printer_driver_init();  
   	usbh_init();
   	spi_sd_init();
+	while(1)
+		{
+		rt_thread_delay(RT_TICK_PER_SECOND*3);
+
+		}
 	
 
 #if 0	
@@ -81,5 +86,7 @@ int rt_application_init()
     if (tid != RT_NULL)  rt_thread_startup(tid);
     return 0;
 }
+
+
 
 /*@}*/

@@ -15,17 +15,15 @@
 #include <stm32f4xx.h>
 #include <finsh.h>
 #include "rtc.h"
-#include "scr.h"
+
 
 __IO uint32_t			AsynchPrediv = 0, SynchPrediv = 0;
 RTC_TimeTypeDef			RTC_TimeStructure;
 RTC_InitTypeDef			RTC_InitStructure;
 RTC_DateTypeDef			RTC_DateStructure;
 
-static struct rt_device dev_rtc;
 
-
-#define RTC_CONFIGED_FLAG 0x32f2
+#define RTC_CONFIGED_FLAG 0x32f3
 
 #define RTC_CLOCK_SOURCE_LSE /* LSE used as RTC source clock */
 
@@ -46,7 +44,7 @@ __IO uint32_t		uwSynchPrediv	= 0;
 static ErrorStatus RTC_Config( void )
 {
 	RTC_DateTypeDef RTC_DateStructure;
-	__IO uint32_t	timeout = 0xC0000;
+	__IO uint32_t	timeout = 0x400000;
 
 	RCC_APB1PeriphClockCmd( RCC_APB1Periph_PWR, ENABLE );
 	PWR_BackupAccessCmd( ENABLE );
@@ -63,7 +61,7 @@ static ErrorStatus RTC_Config( void )
 			timeout--;
 		}else
 		{
-			rt_kprintf( "\r\n%s(%d) error\r\n", __func__, __LINE__ );
+			rt_kprintf( "\n%s(%d) error\n", __func__, __LINE__ );
 			return ERROR;
 		}
 	}
@@ -105,10 +103,13 @@ static ErrorStatus RTC_Config( void )
 		return SUCCESS;
 	}else
 	{
-		rt_kprintf( "\r\n%s(%d) error\r\n", __func__, __LINE__ );
+		rt_kprintf( "\n%s(%d) error", __func__, __LINE__ );
 		return ERROR;
 	}
 }
+
+
+
 
 /**
  * @brief  Display the current time.
@@ -121,7 +122,7 @@ void datetime( void )
 	RTC_GetTime( RTC_Format_BIN, &RTC_TimeStructure );
 	RTC_GetDate(RTC_Format_BIN,&RTC_DateStructure);
 	/* Display time Format : hh:mm:ss */
-	rt_kprintf( "\r\nRTC=%02d-%02d-%02d %02d:%02d:%02d",\
+	rt_kprintf( "\nRTC=%02d-%02d-%02d %02d:%02d:%02d",\
 		RTC_DateStructure.RTC_Year,\
 		RTC_DateStructure.RTC_Month,\
 		RTC_DateStructure.RTC_Date,\
@@ -132,6 +133,7 @@ void datetime( void )
 
 FINSH_FUNCTION_EXPORT(datetime,show time);
 
+/*设置时间*/
 void time_set(uint8_t hour,uint8_t min,uint8_t sec)
 {
 	RTC_TimeStructure.RTC_H12	  = RTC_H12_AM;
@@ -143,6 +145,8 @@ void time_set(uint8_t hour,uint8_t min,uint8_t sec)
 }
 FINSH_FUNCTION_EXPORT(time_set,set time);
 
+
+/*设置日期*/
 void date_set(uint8_t year,uint8_t month,uint8_t day)
 {
 	RTC_DateStructure.RTC_Year   = year;
@@ -164,25 +168,24 @@ FINSH_FUNCTION_EXPORT(date_set,set date);
 * Return:
 * Others:
 ***********************************************************/
-static rt_err_t rtc_init( rt_device_t dev )
+rt_err_t rtc_init(void )
 {
-	LCD_MSG lcdmsg;
 	if( RTC_ReadBackupRegister( RTC_BKP_DR0 ) != RTC_CONFIGED_FLAG )
 	{
-		rt_kprintf( "\r\n not config 0x32F2\r\n" );
+		rt_kprintf( "\n>RTC_CONFIGED_FLAG ERR" );
 		/* RTC configuration	*/
 		if( RTC_Config( ) == ERROR )
 		{
-			rt_kprintf( "\r\n%s(%d) RTC error\r\n", __func__, __LINE__ );
+			rt_kprintf( "\n%s(%d) RTC error", __func__, __LINE__ );
 			goto lbl_rtc_err;
 		}
 		/* Display the RTC Time and Alarm */
 		datetime( );
-		rt_kprintf("\r\n RTC OK\r\n");
+		rt_kprintf("\nRTC OK\n");
 		goto lbl_rtc_ok;
 	}else
 	{
-		rt_kprintf( "\r\n wait ForSynchro\r\n" );
+		rt_kprintf( "\nwait ForSynchro\n" );
 
 		/* Enable the PWR clock */
 		RCC_APB1PeriphClockCmd( RCC_APB1Periph_PWR, ENABLE );
@@ -194,100 +197,72 @@ static rt_err_t rtc_init( rt_device_t dev )
 		if( RTC_WaitForSynchro( ) == SUCCESS )
 		{
 			datetime( );
-			rt_kprintf("\r\n RTC OK\r\n");
+			rt_kprintf("\nRTC OK");
 			goto lbl_rtc_ok;
 		}else
 		{
-			rt_kprintf( "\r\n%s(%d) error\r\n", __func__, __LINE__ );
+			rt_kprintf( "\n%s(%d) error", __func__, __LINE__ );
 			goto lbl_rtc_err;
 		}
 	}
 lbl_rtc_err:
-	lcdmsg.id=LCD_MSG_ID_RTC;
-	lcdmsg.info.payload[0]=ERROR;
-	pscr->msg(&lcdmsg);
 	return 1;
 lbl_rtc_ok:
-	lcdmsg.id=LCD_MSG_ID_RTC;
-	lcdmsg.info.payload[0]=SUCCESS;
-	pscr->msg(&lcdmsg);
 	return 0;
 }
 
-/**/
-static rt_err_t rtc_open( rt_device_t dev, rt_uint16_t oflag )
-{
-	return RT_EOK;
-}
+/*
+返回系统的时间戳
+为了避免频繁计算
+调用间隔小于10s的直接给累加上去
 
-/**/
-static rt_size_t rtc_read( rt_device_t dev, rt_off_t pos, void* buff, rt_size_t count )
-{
-	return RT_EOK;
-}
 
-/***********************************************************
-* Function:       // 函数名称
-* Description:    // 函数功能、性能等的描述
-* Input:          // 1.输入参数1，说明，包括每个参数的作用、取值说明及参数间关系
-* Input:          // 2.输入参数2，说明，包括每个参数的作用、取值说明及参数间关系
-* Output:         // 1.输出参数1，说明
-* Return:         // 函数返回值的说明
-* Others:         // 其它说明
-***********************************************************/
-static rt_size_t rtc_write( rt_device_t dev, rt_off_t pos, const void* buff, rt_size_t count )
-{
-	rt_size_t ret = RT_EOK;
-	return ret;
-}
+*/
 
-/**/
-static rt_err_t rtc_control( rt_device_t dev, rt_uint8_t cmd, void *arg )
+
+unsigned long timestamp(void)
 {
-	uint32_t	code = *(uint32_t*)arg;
-	int			i;
-	switch( cmd )
+	RTC_TimeTypeDef ts;
+	RTC_DateTypeDef ds;
+	unsigned int year,mon,day;
+	unsigned int hour,min, sec;
+
+	static rt_time_t	last_get_tick=0;
+	static unsigned long last_ts=0;
+
+	__IO int32_t delta;
+	delta=rt_tick_get()-last_get_tick;
+
+	if(delta<RT_TICK_PER_SECOND*10)
 	{
+		return last_ts+delta/RT_TICK_PER_SECOND;
+
 	}
-	return RT_EOK;
-}
+	
+	RTC_GetTime( RTC_Format_BIN, &ts );
+	RTC_GetDate(RTC_Format_BIN,&ds);
+	year=ds.RTC_Year+2000;
+	mon=ds.RTC_Month;
+	day=ds.RTC_Date;
+	hour=ts.RTC_Hours;
+	min=ts.RTC_Minutes;
+	sec=ts.RTC_Seconds;
+	if( 0 >= (int)( mon-= 2 ) )    /**//* 1..12 -> 11,12,1..10 */
+	{
+		mon		+= 12;              /**//* Puts Feb last since it has leap day */
+		year	-= 1;
+	}
 
-/***********************************************************
-* Function:
-* Description:在此给打印机断电
-* Input:
-* Input:
-* Output:
-* Return:
-* Others:
-***********************************************************/
-static rt_err_t rtc_close( rt_device_t dev )
-{
-	return RT_EOK;
-}
+	last_get_tick=rt_tick_get();
+	last_ts= ( ( ( (unsigned long)( year / 4 - year / 100 + year / 400 + 367 * mon / 12 + day ) +
+	               year * 365 - 719499
+	               ) * 24 + hour    /**//* now have hours */
+	           ) * 60 + min         /**//* now have minutes */
+	         ) * 60 + sec;   
 
-/***********************************************************
-* Function:
-* Description:
-* Input:
-* Input:
-* Output:
-* Return:
-* Others:
-***********************************************************/
-void rtc_driver_init( void )
-{
-	dev_rtc.type		= RT_Device_Class_RTC;
-	dev_rtc.init		= rtc_init;
-	dev_rtc.open		= rtc_open;
-	dev_rtc.close		= rtc_close;
-	dev_rtc.read		= rtc_read;
-	dev_rtc.write		= rtc_write;
-	dev_rtc.control		= rtc_control;
-	dev_rtc.user_data	= RT_NULL;
-
-	rt_device_register( &dev_rtc, "rtc", RT_DEVICE_FLAG_RDWR );
-	rt_device_init( &dev_rtc );
+	return last_ts;
 }
+FINSH_FUNCTION_EXPORT(timestamp,get timestamp);
+
 
 /************************************** The End Of File **************************************/

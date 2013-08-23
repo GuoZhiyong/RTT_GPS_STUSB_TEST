@@ -22,6 +22,7 @@
 #define  TRUE   1
 #define  FALSE  0
 
+extern uint8_t IC_Card_Checked;
 
 void Init_4442(void);
 void CheckICCard(void);

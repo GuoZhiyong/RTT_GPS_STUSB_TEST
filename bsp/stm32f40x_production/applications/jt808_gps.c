@@ -21,6 +21,9 @@
 #include "scr.h"
 #include "jt808_gps.h"
 
+#include "common.h"
+
+
 /*
    $GNRMC,074001.00,A,3905.291037,N,11733.138255,E,0.1,,171212,,,A*655220.9*3F0E
    $GNTXT,01,01,01,ANTENNA OK*2B7,N,11733.138255,E,0.1,,171212,,,A*655220.9*3F0E
@@ -35,34 +38,37 @@
    返回处理的字段数，如果正确的话
  */
 
-static LCD_MSG lcd_msg;
+static LCD_MSG	lcd_msg;
 
-uint32_t gps_sec_count=0;
+uint32_t		gps_sec_count = 0;
 
-uint32_t gps_fixed_sec;
-GPS_STATUS	gps_status;
-uint32_t jt808_alarm=0;
+uint32_t		gps_fixed_sec=0;
+GPS_STATUS		gps_status;
+uint32_t		jt808_alarm = 0;
 
+uint8_t			gps_av		= 'V';
+uint8_t			gps_year	= 0, gps_month = 0, gps_day = 0;
+
+uint8_t			gps_hour	= 0, gps_minute = 0, gps_sec = 0;
 
 /**/
 uint8_t process_rmc( uint8_t * pinfo )
 {
 	//检查数据完整性,执行数据转换
-	uint8_t		year = 0, mon = 0, day = 0, hour = 0, min = 0, sec = 0, fDateModify = 0;
+	uint8_t		year = 0, mon = 0, day = 0, fDateModify = 0;
 	uint32_t	degrees, minutes;
 	uint8_t		count;
 
-	uint8_t 	buf[16];
-	uint8_t gps_av,gps_ew,gps_ns;
-	
-	uint8_t		*psrc = pinfo + 7; //指向开始位置
+	uint8_t		buf[16];
+	uint8_t		gps_ew, gps_ns;
 
+	uint8_t		*psrc = pinfo + 7; //指向开始位置
 
 	//rt_kprintf("\r\ngps>%s",pinfo);
 
 /*时间处理 $GNRMC,023548.00,V,,,,,,,270313,,,N*6F*/
 	count = 0;
-	while(( *psrc != ',' )&&(count<16))
+	while( ( *psrc != ',' ) && ( count < 16 ) )
 	{
 		buf[count++]	= *psrc;
 		buf[count]		= 0;
@@ -70,20 +76,20 @@ uint8_t process_rmc( uint8_t * pinfo )
 	}
 	if( count != 0 )
 	{
-		hour	= ( buf[0] - 0x30 ) * 10 + ( buf[1] - 0x30 ) + 8;
-		min		= ( buf[2] - 0x30 ) * 10 + ( buf[3] - 0x30 );
-		sec		= ( buf[4] - 0x30 ) * 10 + ( buf[5] - 0x30 );
-		if( hour > 23 )
+		gps_hour	= ( buf[0] - 0x30 ) * 10 + ( buf[1] - 0x30 ) + 8;
+		gps_minute	= ( buf[2] - 0x30 ) * 10 + ( buf[3] - 0x30 );
+		gps_sec		= ( buf[4] - 0x30 ) * 10 + ( buf[5] - 0x30 );
+		if( gps_hour > 23 )
 		{
 			fDateModify = 1;
-			hour		-= 24;
+			gps_hour	-= 24;
 		}
 	}
 /*A_V处理*/
 	psrc++;
-	count = 0;
-	gps_av='V';
-	while(( *psrc != ',' )&&(count<16))
+	count	= 0;
+	gps_av	= 'V';
+	while( ( *psrc != ',' ) && ( count < 16 ) )
 	{
 		buf[count++]	= *psrc;
 		buf[count]		= 0;
@@ -96,13 +102,13 @@ uint8_t process_rmc( uint8_t * pinfo )
 
 /*纬度处理ddmm.mmmmmm*/
 	psrc++;
-	count = 0;
-	degrees=0;
-	minutes=0;
+	count	= 0;
+	degrees = 0;
+	minutes = 0;
 	while( ( *psrc != ',' ) && ( count < 16 ) )
 	{
 		buf [count++]	= *psrc;
-		buf [count]	= 0;
+		buf [count]		= 0;
 		psrc++;
 	}
 	if( count != 0 )
@@ -118,9 +124,9 @@ uint8_t process_rmc( uint8_t * pinfo )
 	}
 /*N_S处理*/
 	psrc++;
-	count = 0;
-	gps_ns='N';
-	while(( *psrc != ',' )&&(count<16))
+	count	= 0;
+	gps_ns	= 'N';
+	while( ( *psrc != ',' ) && ( count < 16 ) )
 	{
 		buf[count++]	= *psrc;
 		buf[count]		= 0;
@@ -134,10 +140,10 @@ uint8_t process_rmc( uint8_t * pinfo )
 /*经度处理*/
 	psrc++;
 	count = 0;
-	while(( *psrc != ',' )&&(count<16))
+	while( ( *psrc != ',' ) && ( count < 16 ) )
 	{
-		buf[count++] = *psrc;
-		buf[count]	= 0;
+		buf[count++]	= *psrc;
+		buf[count]		= 0;
 		psrc++;
 	}
 	if( count != 0 )
@@ -153,9 +159,9 @@ uint8_t process_rmc( uint8_t * pinfo )
 	}
 /*N_S处理*/
 	psrc++;
-	count = 0;
-	gps_ns='E';
-	while(( *psrc != ',' )&&(count<16))
+	count	= 0;
+	gps_ns	= 'E';
+	while( ( *psrc != ',' ) && ( count < 16 ) )
 	{
 		buf[count++]	= *psrc;
 		buf[count]		= 0;
@@ -171,11 +177,10 @@ uint8_t process_rmc( uint8_t * pinfo )
 	count = 0;
 	while( *psrc != ',' )
 	{
-		buf [count++] = *psrc;
-		buf [count]	= 0;
+		buf [count++]	= *psrc;
+		buf [count]		= 0;
 		psrc++;
 	}
-
 
 /*方向处理*/
 	psrc++;
@@ -187,21 +192,19 @@ uint8_t process_rmc( uint8_t * pinfo )
 		psrc++;
 	}
 
-
 /*日期处理*/
 	psrc++;
 	count = 0;
 	while( ( *psrc != ',' ) && ( count < 12 ) )
 	{
 		buf [count++]	= *psrc;
-		buf [count]	= 0;
+		buf [count]		= 0;
 		psrc++;
 	}
 	if( count == 0 )
 	{
 		return 8;
 	}
-
 
 	day		= ( ( buf [0] - 0x30 ) * 10 ) + ( buf [1] - 0x30 );
 	mon		= ( ( buf [2] - 0x30 ) * 10 ) + ( buf [3] - 0x30 );
@@ -242,16 +245,19 @@ uint8_t process_rmc( uint8_t * pinfo )
 			}
 		}
 	}
+	gps_year=year;
+	gps_month=mon;
+	gps_day=day;
+	if( gps_fixed_sec == 0 )
+	{
+		time_set( gps_hour, gps_minute, gps_sec );
+		date_set( gps_year, gps_month, gps_day );
+		gps_fixed_sec = gps_sec_count;
+		test_flag|=TEST_BIT_GPS;
+		rt_kprintf("\r\ntest_flag=%x",test_flag);
+		rt_kprintf("\r\n>gps fixed sec=%d",gps_fixed_sec);
+	}
 
-	lcd_msg.id						= LCD_MSG_ID_GPS;
-	lcd_msg.info.gps_rmc.gps_av		= gps_av;
-	lcd_msg.info.gps_rmc.year		= year;
-	lcd_msg.info.gps_rmc.month		= mon;
-	lcd_msg.info.gps_rmc.day		= day;
-	lcd_msg.info.gps_rmc.hour		= hour;
-	lcd_msg.info.gps_rmc.minitue	= min;
-	lcd_msg.info.gps_rmc.sec		= sec;
-	pscr->msg( (void*)&lcd_msg );
 	return 0;
 }
 
@@ -267,11 +273,11 @@ uint8_t process_rmc( uint8_t * pinfo )
 uint8_t process_gga( uint8_t * pinfo )
 {
 	//检查数据完整性,执行数据转换
-	uint8_t		NoSV;
-	uint8_t		i;
-	uint8_t		buf[20];
-	uint8_t		commacount	= 0, count = 0;
-	uint8_t		*psrc		= pinfo + 7; //指向开始位置
+	uint8_t NoSV;
+	uint8_t i;
+	uint8_t buf[20];
+	uint8_t commacount	= 0, count = 0;
+	uint8_t *psrc		= pinfo + 7; //指向开始位置
 
 	while( *psrc++ )
 	{
@@ -331,10 +337,6 @@ uint8_t process_gga( uint8_t * pinfo )
 }
 
 
-
-
-
-
 /***********************************************************
 * Function:
 * Description:gps收到信息后的处理，头两个字节为长度
@@ -371,16 +373,7 @@ void gps_rx( uint8_t * pinfo, uint16_t length )
 	{
 		gps_sec_count++;
 		ret = process_rmc( (uint8_t*)psrc );
-
-		if( ret == 0 )                          /*已定位*/
-		{
-			if( gps_fixed_sec == 0 )
-			{
-				gps_fixed_sec = gps_sec_count;
-			}
-		}
 	}
 }
-
 
 /************************************** The End Of File **************************************/

@@ -664,9 +664,7 @@ uint8_t			BuzzerFlag = 0;
 * Return:
 * Others:
 ***********************************************************/
-static uint8_t IC_Card_Checked=0; 	/*卡是否已检测*/
-static LCD_MSG 		lcdmsg;
-
+uint8_t IC_Card_Checked=0; 	/*卡是否已检测 0:未插入，1:已插入正确 2:插入但数据错误*/
 
 void CheckICCard( void )
 {
@@ -730,17 +728,10 @@ void CheckICCard( void )
 				if(result==0)
 				{	
 					IC_Card_Checked=1;
-					lcdmsg.id=LCD_MSG_ID_ICCARD;
-					lcdmsg.info.payload[0]=IC_READ_OK; 
-					pscr->msg(&lcdmsg);
-					
 				}
 				else
 				{
-					IC_Card_Checked=1;
-					lcdmsg.id=LCD_MSG_ID_ICCARD;
-					lcdmsg.info.payload[0]=IC_READ_ERR; 
-					pscr->msg(&lcdmsg);
+					IC_Card_Checked=2;
 				}
 			}
 		}
@@ -751,12 +742,6 @@ void CheckICCard( void )
 		_CardSetRST_HIGH;
 		_CardSetPower_LOW;
 		_CardCMDVCC_HIGH;
-		if(IC_Card_Checked==1)
-		{
-			lcdmsg.id=LCD_MSG_ID_ICCARD;
-			lcdmsg.info.payload[0]=IC_PLUG_OUT; 
-			pscr->msg(&lcdmsg);
-		}	
 		IC_Card_Checked=0;
 	}
 }

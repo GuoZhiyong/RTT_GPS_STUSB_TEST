@@ -21,7 +21,7 @@
 #include "stm32f4xx.h"
 #include "gps.h"
 #include "jt808_gps.h"
-
+#include "common.h"
 #include <finsh.h>
 
 #define GPS_PWR_PORT	GPIOD
@@ -432,6 +432,7 @@ static void rt_thread_entry_gps( void* parameter )
 		{
 			rt_kprintf( "%d>gps no output\r\n", rt_tick_get( ) );
 			jt808_alarm |= BIT_ALARM_GPS_ERR;
+			test_flag|=TEST_BIT_GPS;
 			GPIO_ResetBits( GPIOD, GPIO_Pin_10 );                           /*off gps*/
 			while( rt_mq_recv( &mq_gps, (void*)&buf, NEMA_SIZE, RT_TICK_PER_SECOND / 20 ) == RT_EOK )
 			{
@@ -459,6 +460,8 @@ static void rt_thread_entry_gps( void* parameter )
 							rt_kprintf( "\n开路了" );
 						}
 						jt808_alarm |= BIT_ALARM_GPS_OPEN;
+						test_flag|=TEST_BIT_GPS;
+						rt_kprintf("\r\ntest_flag=%x",test_flag);
 					}else
 					{
 						jt808_alarm &= ~BIT_ALARM_GPS_OPEN;
@@ -467,6 +470,8 @@ static void rt_thread_entry_gps( void* parameter )
 					if( !GPIO_ReadInputDataBit( GPIOB, GPIO_Pin_6 ) ) //短路检测  0:天线短路
 					{
 						jt808_alarm |= BIT_ALARM_GPS_SHORT;
+						test_flag|=TEST_BIT_GPS;
+						rt_kprintf("\r\ntest_flag=%x",test_flag);
 					}else
 					{
 						jt808_alarm &= ~BIT_ALARM_GPS_SHORT;
@@ -939,21 +944,6 @@ end_upgrade_usb_0:
 	//GPIO_SetBits( GPIOD, GPIO_Pin_10 );
 }
 
-/*gps升级*/
-rt_err_t gps_upgrade( void )
-{
-	rt_thread_t tid;
-	tid = rt_thread_create( "upgrade", thread_gps_upgrade_udisk, (void*)msg_uart_usb, 1024, 5, 5 );
-	if( tid != RT_NULL )
-	{
-		rt_thread_startup( tid );
-	}else
-	{
-		rt_kprintf( "\n Upgrade from usb fail\n" );
-	}
-}
-
-FINSH_FUNCTION_EXPORT( gps_upgrade, upgrade bd_gps );
 
 static char *reset_str[] = {
 	"$CCSIR,1,0*49\r\n",    /*热启动 BD*/

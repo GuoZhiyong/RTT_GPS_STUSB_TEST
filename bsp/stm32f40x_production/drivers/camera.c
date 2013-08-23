@@ -18,6 +18,8 @@
 #include "scr.h"
 #include <finsh.h>
 
+#include "common.h"
+
 /*声明一个cam设备*/
 static struct rt_device dev_cam;
 
@@ -30,6 +32,7 @@ static uint32_t last_rx_tick	= 0;
 #define UART2_RX_SIZE 1024
 static uint8_t	uart2_rx[UART2_RX_SIZE];
 static uint16_t uart2_rx_wr = 0;
+
 
 /*
    cam接收中断处理，收到\n认为收到一包
@@ -48,7 +51,6 @@ void USART2_IRQHandler( void )
 	}
 	rt_interrupt_leave( );
 }
-
 
 /*初始化*/
 static rt_err_t dev_cam_init( rt_device_t dev )
@@ -70,10 +72,8 @@ static rt_err_t dev_cam_init( rt_device_t dev )
 	GPIO_InitStructure.GPIO_Mode	= GPIO_Mode_AF;
 	GPIO_InitStructure.GPIO_Speed	= GPIO_Speed_50MHz;
 
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2|GPIO_Pin_3;
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2 | GPIO_Pin_3;
 	GPIO_Init( GPIOA, &GPIO_InitStructure );
-
-
 
 	USART_InitStructure.USART_BaudRate				= 57600; //485
 	USART_InitStructure.USART_WordLength			= USART_WordLength_8b;
@@ -85,7 +85,7 @@ static rt_err_t dev_cam_init( rt_device_t dev )
 
 	/* Enable USART */
 	USART_Cmd( USART2, ENABLE );
-	
+
 	USART_ITConfig( USART2, USART_IT_RXNE, ENABLE );
 	USART_GetFlagStatus( USART2, USART_FLAG_TC );
 
@@ -94,6 +94,7 @@ static rt_err_t dev_cam_init( rt_device_t dev )
 	NVIC_InitStructure.NVIC_IRQChannelSubPriority			= 2;
 	NVIC_InitStructure.NVIC_IRQChannelCmd					= ENABLE;
 	NVIC_Init( &NVIC_InitStructure );
+
 
 	/*
 	   STM32 Pin              Remark
@@ -172,8 +173,15 @@ static void uart2_putc( const char c )
 	USART2->DR = ( c & 0x1FF );
 }
 
-
-
+/***********************************************************
+* Function:
+* Description:
+* Input:
+* Input:
+* Output:
+* Return:
+* Others:
+***********************************************************/
 static void delay_us( const uint32_t usec )
 {
 	__IO uint32_t	count	= 0;
@@ -187,7 +195,6 @@ static void delay_us( const uint32_t usec )
 	}
 	while( 1 );
 }
-
 
 /***********************************************************
 * Function:		cam_write
@@ -234,20 +241,18 @@ static rt_err_t dev_cam_control( rt_device_t dev, rt_uint8_t cmd, void *arg )
 	return RT_EOK;
 }
 
-
-typedef enum 
+typedef enum
 {
-	CAM_NONE=0,
-	CAM_IDLE=1,
+	CAM_NONE	= 0,
+	CAM_IDLE	= 1,
 	CAM_START,
 	CAM_PHOTO,
 	CAM_END
 }CAM_STATE;
 
-
 typedef enum
 {
-	RX_IDLE=0,
+	RX_IDLE = 0,
 	RX_SYNC1,
 	RX_SYNC2,
 	RX_HEAD,
@@ -255,13 +260,7 @@ typedef enum
 	RX_FCS,
 	RX_0D,
 	RX_0A,
-}CAM_RX_STATE;	
-
-
-
-
-
-
+}CAM_RX_STATE;
 
 /**/
 
@@ -271,32 +270,29 @@ struct rt_thread thread_cam;
 /**/
 static void rt_thread_entry_cam( void* parameter )
 {
+	uint8_t			Take_photo[10]		= { 0x40, 0x40, 0x61, 0x81, 0x02, 0X00, 0X00, 0X02, 0X0D, 0X0A };   //----	报警拍照命令
+	uint8_t			Fectch_photo[10]	= { 0x40, 0x40, 0x62, 0x81, 0x02, 0X00, 0XFF, 0XFF, 0X0D, 0X0A };   //----- 报警取图命令
 
-	uint8_t Take_photo[10] = { 0x40, 0x40, 0x61, 0x81, 0x02, 0X00, 0X00, 0X02, 0X0D, 0X0A };	//----	报警拍照命令
-	uint8_t Fectch_photo[10] = { 0x40, 0x40, 0x62, 0x81, 0x02, 0X00, 0XFF, 0XFF, 0X0D, 0X0A };	//----- 报警取图命令
+	uint8_t			ch, cam_no = 0x1;
+	__IO uint8_t	cam_rxed	= 0;
+	CAM_STATE		cam_state	= CAM_IDLE;
 
-	uint8_t ch,cam_no=0x1;
-	__IO uint8_t cam_rxed = 0;
-	CAM_STATE cam_state=CAM_IDLE;
+	__IO uint32_t	tick;
+	uint32_t		cam_photo_size	= 0;
+	uint8_t			cam_last_page	= 0;
+	uint16_t		page_seq;
+	uint16_t		page_size;
+	uint32_t		i;
 
-	__IO uint32_t tick;
-	uint32_t cam_photo_size=0;
-	uint8_t cam_last_page=0;
-	uint16_t page_seq;
-	uint16_t page_size;
-	uint32_t i;
+	uint8_t			cam_rx_head[5];
+	uint8_t			cam_rx_head_wr	= 0;
+	uint8_t			retry			= 3; /*老摄像头一次命令不能成功*/
+	LCD_MSG			lcd_msg;
 
-	uint8_t cam_rx_head[5];
-	uint8_t cam_rx_head_wr=0;
-	uint8_t retry=3;  /*老摄像头一次命令不能成功*/
-	LCD_MSG lcd_msg;
+	CAM_RX_STATE	cam_rx_state = RX_IDLE;
 
-	CAM_RX_STATE cam_rx_state=RX_IDLE;
-
-	rt_thread_delay( RT_TICK_PER_SECOND *15 );
-	dev_cam_open(&dev_cam,RT_DEVICE_FLAG_RDWR);
-
-
+	rt_thread_delay( RT_TICK_PER_SECOND * 15 );
+	dev_cam_open( &dev_cam, RT_DEVICE_FLAG_RDWR );
 
 	while( 1 )
 	{
@@ -307,135 +303,158 @@ static void rt_thread_entry_cam( void* parameter )
 			ch				= uart2_rxbuf[uart2_rxbuf_rd++];
 			uart2_rxbuf_rd	%= UART2_RXBUF_SIZE;
 			//rt_kprintf("%02X",ch);
-			switch(cam_rx_state)
+			switch( cam_rx_state )
 			{
 				case RX_DATA: /*保存信息格式: 位置(2B) 大小(2B) FLAG_FF 数据 0D 0A*/
 					uart2_rx[uart2_rx_wr++] = ch;
 					uart2_rx_wr				%= UART2_RX_SIZE;
-					if(uart2_rx_wr==page_size) cam_rx_state=RX_FCS;
-					break;	
+					if( uart2_rx_wr == page_size )
+					{
+						cam_rx_state = RX_FCS;
+					}
+					break;
 				case RX_IDLE:
-					if(ch==0x40) cam_rx_state=RX_SYNC1;
+					if( ch == 0x40 )
+					{
+						cam_rx_state = RX_SYNC1;
+					}
 					break;
 				case RX_SYNC1:
-					if(ch==0x40) cam_rx_state=RX_SYNC2;
-					else cam_rx_state=RX_IDLE;
+					if( ch == 0x40 )
+					{
+						cam_rx_state = RX_SYNC2;
+					} else
+					{
+						cam_rx_state = RX_IDLE;
+					}
 					break;
 				case RX_SYNC2:
-					if(ch==0x63)
+					if( ch == 0x63 )
 					{
-						cam_rx_head_wr=0;
-						cam_rx_state=RX_HEAD;
-					}	
-					else 
-						cam_rx_state=RX_IDLE;
+						cam_rx_head_wr	= 0;
+						cam_rx_state	= RX_HEAD;
+					}else
+					{
+						cam_rx_state = RX_IDLE;
+					}
 					break;
 				case RX_HEAD:
-					cam_rx_head[cam_rx_head_wr++]=ch;
-					if(cam_rx_head_wr==5)
+					cam_rx_head[cam_rx_head_wr++] = ch;
+					if( cam_rx_head_wr == 5 )
 					{
-						uart2_rx_wr=0;
-						page_size=(cam_rx_head[3]<<8)|cam_rx_head[2];
-						cam_rx_state=RX_DATA;
+						uart2_rx_wr		= 0;
+						page_size		= ( cam_rx_head[3] << 8 ) | cam_rx_head[2];
+						cam_rx_state	= RX_DATA;
 					}
 					break;
 				case RX_FCS:
-					cam_rx_state=RX_0D;
-					break;		
+					cam_rx_state = RX_0D;
+					break;
 				case RX_0D:
-					if(ch==0x0d) cam_rx_state=RX_0A;
-					else cam_rx_state=RX_IDLE;
-					break;	
+					if( ch == 0x0d )
+					{
+						cam_rx_state = RX_0A;
+					} else
+					{
+						cam_rx_state = RX_IDLE;
+					}
+					break;
 				case RX_0A:
-					if(ch==0x0a) cam_rxed=1;
-					cam_rx_state=RX_IDLE;
-					break;	
+					if( ch == 0x0a )
+					{
+						cam_rxed = 1;
+					}
+					cam_rx_state = RX_IDLE;
+					break;
 			}
 		}
 		/*cam接收处理*/
 		switch( cam_state )
 		{
 			case CAM_IDLE:
-				dev_cam_open(&dev_cam,RT_DEVICE_FLAG_RDWR);
-				tick=rt_tick_get();
-				retry=3;
-				cam_state = CAM_START;
+				dev_cam_open( &dev_cam, RT_DEVICE_FLAG_RDWR );
+				tick		= rt_tick_get( );
+				retry		= 3;
+				cam_state	= CAM_START;
 				break;
 			case CAM_START:
-				if(rt_tick_get()-tick<RT_TICK_PER_SECOND/10) break;
-				Take_photo[4]=cam_no;
-				rt_kprintf("\r\n%d>CAM%d START\r\n",rt_tick_get()*10,cam_no);
+				if( rt_tick_get( ) - tick < RT_TICK_PER_SECOND / 10 )
+				{
+					break;
+				}
+				Take_photo[4] = cam_no;
+				rt_kprintf( "\r\n%d>CAM%d START\r\n", rt_tick_get( ) * 10, cam_no );
 				dev_cam_write( &dev_cam, 0, Take_photo, 10 );
-				
-				cam_photo_size=0;
-				cam_last_page=0;
-				tick=rt_tick_get();
-				cam_state = CAM_PHOTO;
+
+				cam_photo_size	= 0;
+				cam_last_page	= 0;
+				tick			= rt_tick_get( );
+				cam_state		= CAM_PHOTO;
 				break;
 			case CAM_PHOTO:
-				if(rt_tick_get()-tick>RT_TICK_PER_SECOND*5)/*超时*/
+				if( rt_tick_get( ) - tick > RT_TICK_PER_SECOND * 5 ) /*超时*/
 				{
-					rt_kprintf("\r\nCAM%d timeout\r\n",cam_no);
+					rt_kprintf( "\r\nCAM%d timeout\r\n", cam_no );
 					retry--;
-					if(retry) 
+					if( retry )
 					{
-						cam_state=CAM_START;
-						tick=rt_tick_get();
-					}	
-					else
+						cam_state	= CAM_START;
+						tick		= rt_tick_get( );
+					}else
 					{
-						lcd_msg.id=LCD_MSG_ID_CAM;
-						lcd_msg.info.payload[0]=cam_no;
-						lcd_msg.info.payload[1]=ERROR;
-						pscr->msg(&lcd_msg);
-						cam_state=CAM_END;
-					}	
-				}
-				if(cam_rxed==0) break;  /*没有收到数据，跳出*/
-				cam_rxed=0;	/*收到数据，清除*/
-				/*收到数据,存储,判断是否图片结束*/
-				if(uart2_rx_wr>512)		/*数据大于512,非法*/
-				{
-					uart2_rx_wr=0;
-					rt_kprintf("\r\nCAM%d invalided\r\n",cam_no);
-					cam_state=CAM_END;
-					break;
-				}
-				if(uart2_rx_wr==512)
-				{
-					if((uart2_rx[510]==0xff)&&(uart2_rx[511]==0xD9))
-					{
-						cam_last_page=1;
+						test_cam_flag[cam_no]	= 2;
+						cam_state				= CAM_END;
 					}
 				}
-				else
+				if( cam_rxed == 0 )
 				{
-					cam_last_page=1;
+					break;              /*没有收到数据，跳出*/
 				}
-				cam_photo_size+=uart2_rx_wr;
-				/*保存数据*/
-				rt_kprintf("\r\n%d>CAM%d photo %d bytes\r\n",rt_tick_get()*10,cam_no,cam_photo_size);
-				uart2_rx_wr=0;
-				
-				if(cam_last_page)
+				cam_rxed = 0;           /*收到数据，清除*/
+				/*收到数据,存储,判断是否图片结束*/
+				if( uart2_rx_wr > 512 ) /*数据大于512,非法*/
 				{
-					lcd_msg.id=LCD_MSG_ID_CAM;
-					lcd_msg.info.payload[0]=cam_no;
-					lcd_msg.info.payload[1]=SUCCESS;
-					pscr->msg(&lcd_msg);
-					cam_state=CAM_END;
+					uart2_rx_wr = 0;
+					rt_kprintf( "\r\nCAM%d invalided\r\n", cam_no );
+					cam_state = CAM_END;
 					break;
 				}
-				Fectch_photo[4]=cam_no;
+				if( uart2_rx_wr == 512 )
+				{
+					if( ( uart2_rx[510] == 0xff ) && ( uart2_rx[511] == 0xD9 ) )
+					{
+						cam_last_page = 1;
+					}
+				}else
+				{
+					cam_last_page = 1;
+				}
+				cam_photo_size += uart2_rx_wr;
+				/*保存数据*/
+				rt_kprintf( "\r\n%d>CAM%d photo %d bytes\r\n", rt_tick_get( ) * 10, cam_no, cam_photo_size );
+				uart2_rx_wr = 0;
+
+				if( cam_last_page )
+				{
+					test_cam_flag[cam_no]	= 1;
+					cam_state				= CAM_END;
+					break;
+				}
+				Fectch_photo[4] = cam_no;
 				dev_cam_write( &dev_cam, 0, Fectch_photo, 10 );
-				tick=rt_tick_get();
+				tick = rt_tick_get( );
 				break;
 			case CAM_END:
 				cam_no++;
-				if(cam_no>4)
-					cam_state=CAM_NONE;
-				else
-					cam_state=CAM_IDLE;
+				if( cam_no > 4 )
+				{
+					test_flag |= TEST_BIT_CAM;
+					rt_kprintf( "\r\ntest_flag=%x", test_flag );
+					cam_state = CAM_NONE;
+				}else
+				{
+					cam_state = CAM_IDLE;
+				}
 				break;
 		}
 	}
@@ -455,17 +474,13 @@ void cam_init( void )
 	rt_device_register( &dev_cam, "cam", RT_DEVICE_FLAG_RDWR | RT_DEVICE_FLAG_STANDALONE );
 	rt_device_init( &dev_cam );
 
-rt_thread_init( &thread_cam,
-				"cam",
-				rt_thread_entry_cam,
-				RT_NULL,
-				&thread_cam_stack[0],
-				sizeof( thread_cam_stack ), 18, 5 );
-rt_thread_startup( &thread_cam );
-
-	
-
-
+	rt_thread_init( &thread_cam,
+	                "cam",
+	                rt_thread_entry_cam,
+	                RT_NULL,
+	                &thread_cam_stack[0],
+	                sizeof( thread_cam_stack ), 18, 5 );
+	rt_thread_startup( &thread_cam );
 }
 
 /*cam开关*/
@@ -484,12 +499,15 @@ rt_err_t cam_onoff( uint8_t openflag )
 FINSH_FUNCTION_EXPORT( cam_onoff, cam_onoff([1 | 0] ) );
 
 /**/
-rt_size_t cam( uint8_t ch)
+rt_size_t cam( uint8_t ch )
 {
-	if(ch==0)
+	if( ch == 0 )
+	{
 		GPIO_ResetBits( GPIOC, GPIO_Pin_4 );
-	else	
+	} else
+	{
 		GPIO_SetBits( GPIOC, GPIO_Pin_4 );
+	}
 	return 0;
 }
 

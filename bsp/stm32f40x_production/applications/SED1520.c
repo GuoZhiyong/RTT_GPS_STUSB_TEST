@@ -43,8 +43,7 @@ static unsigned char	l_display_array[LCD_Y_BYTES][LCD_X_BYTES];
 #define RW		( 1 << 3 )
 #define A0		( 1 << 4 )
 
-#define BL 		(1<<6)
-
+#define BL ( 1 << 6 )
 
 const unsigned char asc_0608[][6] =
 {
@@ -147,6 +146,11 @@ const unsigned char asc_0608[][6] =
 };
 
 
+
+extern uint8_t	ctrlbit_printer_3v3_on;
+extern uint8_t	ctrlbit_buzzer;
+
+
 /***********************************************************
 * Function:
 * Description:
@@ -156,9 +160,6 @@ const unsigned char asc_0608[][6] =
 * Return:
 * Others:
 ***********************************************************/
-extern uint8_t 	ctrlbit_printer_3v3_on;
-extern uint8_t	ctrlbit_buzzer;
-
 void ControlBitShift( unsigned char data )
 {
 	unsigned char i;
@@ -168,11 +169,20 @@ void ControlBitShift( unsigned char data )
 	GPIO_SetBits( GPIOE, GPIO_Pin_15 );
 	GPIO_ResetBits( GPIOE, GPIO_Pin_13 );
 
-	if(ctrlbit_buzzer) data|=0x80;
-	else data&=0x7f;
-	if(ctrlbit_printer_3v3_on) data|=0x20;
-	else data&=~0x20;
-		
+	if( ctrlbit_buzzer )
+	{
+		data |= 0x80;
+	} else
+	{
+		data &= 0x7f;
+	}
+	if( ctrlbit_printer_3v3_on )
+	{
+		data |= 0x20;
+	} else
+	{
+		data &= ~0x20;
+	}
 
 	for( i = 0; i < 8; i++ )
 	{
@@ -221,7 +231,8 @@ void DataBitShift( unsigned char data )
 		} else
 		{
 			//IOCLR0 = DS;
-			GPIO_ResetBits( GPIOE, GPIO_Pin_14 );
+			//GPIO_ResetBits( GPIOE, GPIO_Pin_14 );
+			GPIOE->BSRRH=GPIO_Pin_14;
 		}
 		//IOSET0 = SHCP;
 		GPIO_SetBits( GPIOE, GPIO_Pin_12 );
@@ -247,7 +258,7 @@ void lcd_out_ctl( const unsigned char cmd, const unsigned char ncontr )
 //  LCD_CMD_MODE();
 //	LCDDATAPORT = cmd;
 
-	ControlBitShift( RST0 | BL);
+	ControlBitShift( RST0 | BL );
 	DataBitShift( cmd );
 	ctr = RST0;
 	if( ncontr & 0x01 )
@@ -263,7 +274,7 @@ void lcd_out_ctl( const unsigned char cmd, const unsigned char ncontr )
 	for( i = 0; i < 0xf; i++ )
 	{
 	}
-	ControlBitShift( RST0 | BL);
+	ControlBitShift( RST0 | BL );
 }
 
 /*
@@ -291,12 +302,12 @@ void lcd_out_dat( const unsigned char dat, const unsigned char ncontr )
 	{
 		ctr |= E2;
 	}
-	ControlBitShift( ctr |  BL  );
+	ControlBitShift( ctr | BL );
 	//delay(1);
 	for( i = 0; i < 0xf; i++ )
 	{
 	}
-	ControlBitShift( RST0 | A0 | BL  );
+	ControlBitShift( RST0 | A0 | BL );
 }
 
 /*
@@ -388,14 +399,19 @@ void lcd_update( const unsigned char top, const unsigned char bottom )
 		lcd_out_ctl( LCD_SET_PAGE + y, 3 ); /* set page */
 		lcd_out_ctl( LCD_SET_COL + 0, 3 );
 		colptr = &l_display_array[y][0];
-		for( x = 0; x < 61; x++ ) lcd_out_dat( *colptr++, 1 );
-		for( x = 61; x < 122; x++ ) lcd_out_dat( *colptr++, 2 );
+		for( x = 0; x < 61; x++ )
+		{
+			lcd_out_dat( *colptr++, 1 );
+		}
+		for( x = 61; x < 122; x++ )
+		{
+			lcd_out_dat( *colptr++, 2 );
+		}
 	}
 }
 
-
 /**/
-void lcd_update_region( uint8_t left,uint8_t top, uint8_t right,uint8_t bottom )
+void lcd_update_region( uint8_t left, uint8_t top, uint8_t right, uint8_t bottom )
 {
 	unsigned char	x;
 	unsigned char	y;
@@ -412,14 +428,16 @@ void lcd_update_region( uint8_t left,uint8_t top, uint8_t right,uint8_t bottom )
 		lcd_out_ctl( LCD_SET_PAGE + y, 3 ); /* set page */
 		lcd_out_ctl( LCD_SET_COL + 0, 3 );
 		colptr = &l_display_array[y][0];
-		for( x = 0; x < 61; x++ ) lcd_out_dat( *colptr++, 1 );
-		for( x = 61; x < 122; x++ ) lcd_out_dat( *colptr++, 2 );
+		for( x = 0; x < 61; x++ )
+		{
+			lcd_out_dat( *colptr++, 1 );
+		}
+		for( x = 61; x < 122; x++ )
+		{
+			lcd_out_dat( *colptr++, 2 );
+		}
 	}
 }
-
-
-
-
 
 /*清空RAM*/
 void lcd_fill( const unsigned char pattern )
@@ -438,38 +456,34 @@ void lcd_fill( const unsigned char pattern )
 }
 
 /*填充或清除指定的区域*/
-void lcd_fill_1(uint8_t left,uint8_t top,uint8_t right,uint8_t bottom,uint8_t pattern)
+void lcd_fill_1( uint8_t left, uint8_t top, uint8_t right, uint8_t bottom, uint8_t pattern )
 {
-	uint32_t val,val_old,mask;
-	uint8_t col;
-	
-	mask=0xFFFFFFFF<<top;
-	mask&=(0xFFFFFFFF>>(31-bottom));
+	uint32_t	val, val_old, mask;
+	uint8_t		col;
 
-	for(col=left;col<=right;col++)
+	mask	= 0xFFFFFFFF << top;
+	mask	&= ( 0xFFFFFFFF >> ( 31 - bottom ) );
+
+	for( col = left; col <= right; col++ )
 	{
-		val_old=l_display_array[0][col];
-		val_old|=l_display_array[1][col]<<8;
-		val_old|=l_display_array[2][col]<<16;
-		val_old|=l_display_array[3][col]<<24;
+		val_old = l_display_array[0][col];
+		val_old |= l_display_array[1][col] << 8;
+		val_old |= l_display_array[2][col] << 16;
+		val_old |= l_display_array[3][col] << 24;
 
-		if(0==pattern) /*清除 特定位*/
+		if( 0 == pattern ) /*清除 特定位*/
 		{
-			val=val_old&(~mask);
-		}	
-		else
+			val = val_old & ( ~mask );
+		}else
 		{
-			val=val_old|mask;
+			val = val_old | mask;
 		}
-		l_display_array[0][col]	= val & 0xff;
-		l_display_array[1][col]	= ( val & 0xff00 ) >> 8;
-		l_display_array[2][col]	= ( val & 0xff0000 ) >> 16;
-		l_display_array[3][col]	= ( val & 0xff000000 ) >> 24;
+		l_display_array[0][col] = val & 0xff;
+		l_display_array[1][col] = ( val & 0xff00 ) >> 8;
+		l_display_array[2][col] = ( val & 0xff0000 ) >> 16;
+		l_display_array[3][col] = ( val & 0xff000000 ) >> 24;
 	}
 }
-
-
-
 
 /*清空屏幕显示*/
 void lcd_clear( const unsigned char top, const unsigned char bottom )
@@ -486,8 +500,14 @@ void lcd_clear( const unsigned char top, const unsigned char bottom )
 	{
 		lcd_out_ctl( LCD_SET_PAGE + y, 3 ); /* set page */
 		lcd_out_ctl( LCD_SET_COL + 0, 3 );
-		for( x = 0; x < 61; x++ ) lcd_out_dat( 0,1 );
-		for( x = 61; x < 122; x++ ) lcd_out_dat( 0,2 );
+		for( x = 0; x < 61; x++ )
+		{
+			lcd_out_dat( 0, 1 );
+		}
+		for( x = 61; x < 122; x++ )
+		{
+			lcd_out_dat( 0, 2 );
+		}
 	}
 }
 
@@ -632,11 +652,9 @@ void lcd_asc0608( char left, char top, char *p, const char mode )
 	}
 }
 
-
-
 /*
    绘制12点阵的字符，包括中文和英文
-*/
+ */
 void lcd_text12( char left, char top, char *pinfo, char len, const char mode )
 {
 	int				charnum = len;
@@ -733,34 +751,29 @@ void lcd_text12( char left, char top, char *pinfo, char len, const char mode )
 	}
 }
 
-
 /*水平线,要保留原来的值*/
-void lcd_hline(uint8_t from,uint8_t to ,uint8_t line)
+void lcd_hline( uint8_t from, uint8_t to, uint8_t line )
 {
-	uint8_t row,col,offset=1;
-	row=line/8;
-	offset=(1<<(line%8));
-	for(col=from;col<=to;col++)
+	uint8_t row, col, offset = 1;
+	row		= line / 8;
+	offset	= ( 1 << ( line % 8 ) );
+	for( col = from; col <= to; col++ )
 	{
-		l_display_array[row][col]|=offset;
+		l_display_array[row][col] |= offset;
 	}
-
-
 }
 
 /*垂直线*/
-void lcd_vline(uint8_t col,uint8_t from,uint8_t to)
+void lcd_vline( uint8_t col, uint8_t from, uint8_t to )
 {
-	uint32_t i,j;
-	i=0xFFFFFFFF<<from;
-	j=0xFFFFFFFF>>(31-to);
-	i&=j;
-	l_display_array[0][col]	= i & 0xff;
-	l_display_array[1][col]	= ( i & 0xff00 ) >> 8;
-	l_display_array[2][col]	= ( i & 0xff0000 ) >> 16;
-	l_display_array[3][col]	= ( i & 0xff000000 ) >> 24;
+	uint32_t i, j;
+	i						= 0xFFFFFFFF << from;
+	j						= 0xFFFFFFFF >> ( 31 - to );
+	i						&= j;
+	l_display_array[0][col] = i & 0xff;
+	l_display_array[1][col] = ( i & 0xff00 ) >> 8;
+	l_display_array[2][col] = ( i & 0xff0000 ) >> 16;
+	l_display_array[3][col] = ( i & 0xff000000 ) >> 24;
 }
-
-
 
 /************************************** The End Of File **************************************/

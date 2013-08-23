@@ -436,6 +436,16 @@
               <FileType>1</FileType>
               <FilePath>.\applications\jt808_gps.c</FilePath>
             </File>
+            <File>
+              <FileName>scr_0_key_lcd.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\applications\scr_0_key_lcd.c</FilePath>
+            </File>
+            <File>
+              <FileName>scr_3_bdupgrade.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\applications\scr_3_bdupgrade.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

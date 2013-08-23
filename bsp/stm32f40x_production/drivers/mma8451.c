@@ -21,6 +21,8 @@
 #include "math.h"
 #include "scr.h"
 
+#include "common.h"
+
 /*
    软件模拟I2C 同MMA8451通讯
 
@@ -621,7 +623,7 @@ void EXTI9_5_IRQHandler( void )
 		ret=IIC_RegRead( MMA845X_ADDR, PULSE_SRC_REG, &value3 );
 		if((value2&0x7F)<0x40)	/*有倾斜发生  0x8x 倾斜发生*/
 		{
-			mems_alarm_tick=10;	
+			mems_alarm_tick=5;	
 			//rt_kprintf("\nv=%02x",value2);
 		}
 		else					/*0xcx 倾斜还原*/
@@ -686,6 +688,7 @@ void EXTILine5_Config( void )
 ***********************************************************/
 static uint8_t mma8451_config( uint16_t param1, uint16_t param2 )
 {
+	extern uint8_t mems_status;
 	unsigned char res, value;
 	LCD_MSG lcdmsg;
 	
@@ -900,16 +903,16 @@ static uint8_t mma8451_config( uint16_t param1, uint16_t param2 )
 	{
 		goto lbl_mma8451_config_err;
 	}
-	lcdmsg.id=LCD_MSG_ID_MEMS;
-	lcdmsg.info.payload[0]=SUCCESS;
-	pscr->msg(&lcdmsg);
+	mems_status=SUCCESS;
+	test_flag|=TEST_BIT_MEMS;
+	rt_kprintf("\r\ntest_flag=%x",test_flag);
 	return ERR_NONE;
 
 
 lbl_mma8451_config_err:
-	lcdmsg.id=LCD_MSG_ID_MEMS;
-	lcdmsg.info.payload[0]=ERROR;
-	pscr->msg(&lcdmsg);
+	mems_status=ERROR;
+	test_flag|=TEST_BIT_MEMS;
+	rt_kprintf("\r\ntest_flag=%x",test_flag);
 	return res;
 }
 

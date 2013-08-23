@@ -101,12 +101,11 @@ extern GPS_STATUS	gps_status;
 
 extern GPS_BASEINFO gps_baseinfo;
 
-extern uint32_t		gps_lati;               /*内部，小端 纬度 10-E6度*/
-extern uint32_t		gps_longi;              /*内部，小端 经度 10-E6度*/
-extern uint16_t		gps_speed;              /*速度 kmh*/
-extern uint16_t		gps_cog;                /*对地方向角*/
-extern uint16_t		gps_alti;               /*高度*/
-extern uint8_t		gps_datetime[6];        /*日期时间 hex格式*/
+extern uint8_t gps_av;
+extern uint8_t gps_hour,gps_minute,gps_sec;
+extern uint8_t gps_year, gps_month, gps_day;
+
+
 
 /*告警和状态信息*/
 extern uint32_t jt808_alarm;

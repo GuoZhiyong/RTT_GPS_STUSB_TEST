@@ -15,52 +15,86 @@
 #include <rtthread.h>
 #include "gsm.h"
 
-static uint32_t keystatus = 0;
+static uint32_t keyvalue = 0;
 
 static uint32_t keycheck	= 0;
 static uint32_t keycount	= 0;
+static uint8_t	key_err		= 0;    /*没有错误*/
 
 /*显示状态信息*/
 static void showinfo( void )
 {
-	char buf[32];
-	if( keycount & 0x01 )
+	char buf[5] = { '0', '0', '0', '0', 0 };
+
+	if( keyvalue == 0 )             /*键抬起*/
 	{
-		lcd_fill( 0xFF );
-	}else
-	{
-		lcd_fill( 0 );
-	}
-	if( keystatus == 0 )
-	{
-		lcd_text12( 0, 0, "显示按键测试", 12, LCD_MODE_SET );
-		if( keycheck == 0x0F )
+		lcd_fill(0);
+		lcd_text12( 0, 0, "液晶按键测试", 12, LCD_MODE_SET );
+		if( keycheck == 0x0F )      /*四个键按下*/
 		{
 			pscr = &scr_1_idle;
 			pscr->show( (void*)0 );
 		}
-		if(keycheck==0xFF)
+		if( key_err )
 		{
 			lcd_text12( 0, 0, "未读到有效按键", 16, LCD_MODE_INVERT );
+			if( key_err & 0x08 )
+			{
+				buf[0] = '1';
+			}
+			if( key_err & 0x04 )
+			{
+				buf[1] = '1';
+			}
+			if( key_err & 0x02 )
+			{
+				buf[2] = '1';
+			}
+			if( key_err & 0x01 )
+			{
+				buf[3] = '1';
+			}
+			lcd_text12( 48, 12, buf, 4, LCD_MODE_SET );
 		}
-	}else if( ( keystatus == KEY_MENU_PRESS ) || ( keystatus == KEY_MENU_REPEAT ) )
+		lcd_update(0,31);
+		return;
+	}
+
+	if( ( keyvalue == KEY_MENU_PRESS ) || ( keyvalue == KEY_MENU_REPEAT ) )
 	{
 		keycheck |= KEY_MENU_PRESS;
-	}else if( ( keystatus == KEY_OK_PRESS ) || ( keystatus == KEY_OK_REPEAT ) )
+		if( keyvalue > 0xF )
+		{
+			lcd_fill( 0xFF );
+		}
+	}else if( ( keyvalue == KEY_OK_PRESS ) || ( keyvalue == KEY_OK_REPEAT ) )
 	{
 		keycheck |= KEY_OK_PRESS;
-	}else if( ( keystatus == KEY_UP_PRESS ) || ( keystatus == KEY_UP_REPEAT ) )
+		
+		if( keyvalue > 0xF )
+		{
+			lcd_fill( 0xFF );
+		}
+	}else if( ( keyvalue == KEY_UP_PRESS ) || ( keyvalue == KEY_UP_REPEAT ) )
 	{
 		keycheck |= KEY_UP_PRESS;
-	}else if( ( keystatus == KEY_DOWN_PRESS ) || ( keystatus == KEY_DOWN_REPEAT ) )
+		
+		if( keyvalue > 0xF )
+		{
+			lcd_fill( 0xFF );
+		}
+	}else if( ( keyvalue == KEY_DOWN_PRESS ) || ( keyvalue == KEY_DOWN_REPEAT ) )
 	{
 		keycheck |= KEY_DOWN_PRESS;
+		
+		if( keyvalue > 0xF )
+		{
+			lcd_fill( 0xFF );
+		}
 	}else
 	{
-		keycheck=0xFF;
+		key_err = keyvalue; /*记录错误的值*/
 	}
-	keycount++;
-
 	lcd_update( 0, 31 );
 }
 
@@ -77,13 +111,10 @@ static void show( void *parent )
 /*按键处理*/
 static void keypress( unsigned int key )
 {
-	if( key ^ keystatus ) /*按键不同*/
+	if( key ^ keyvalue ) /*按键不同*/
 	{
-		keystatus = key;
+		keyvalue = key;
 		showinfo( );
-	}
-	if( key == KEY_MENU_REPEAT )
-	{
 	}
 }
 

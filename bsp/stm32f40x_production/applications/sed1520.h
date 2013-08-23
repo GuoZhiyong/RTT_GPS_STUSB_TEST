@@ -84,6 +84,9 @@ void lcd_hline(uint8_t from,uint8_t to ,uint8_t line);
 void lcd_vline(uint8_t col,uint8_t from,uint8_t to);
 void lcd_fill_1(uint8_t left,uint8_t top,uint8_t right,uint8_t bottom,uint8_t pattern);
 
+/*·äÃùÆ÷Ê¹ÓÃ*/
+void ControlBitShift( unsigned char data );
+
 
 
 #endif

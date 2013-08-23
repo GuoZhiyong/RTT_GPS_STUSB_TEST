@@ -26,6 +26,8 @@
 
 #include "scr.h"
 
+#include "common.h"
+
 #ifdef M66
 
 #define GSM_GPIO			GPIOC
@@ -713,25 +715,25 @@ rt_err_t pt_resp_CPIN( char *p, uint16_t len )
 /*M66 +CSQ: 13,99*/
 /*    +CSQ: 15,99*/
 
-
 rt_err_t pt_resp_CSQ( char *p, uint16_t len )
 {
-	LCD_MSG lcd_msg;
-	char *pstr;
-	uint32_t i, n=0,ber=0;
-	
-	pstr=strstr(p,"+CSQ");
-	if(pstr==(char*)0) return RT_ERROR;
+	char		*pstr;
+	uint32_t	i, n = 0, ber = 0;
+
+	pstr = strstr( p, "+CSQ" );
+	if( pstr == (char*)0 )
+	{
+		return RT_ERROR;
+	}
 	i = sscanf( pstr, "%*[^ ] %d,%d", &n, &ber );
-	
 	if( i != 2 )
 	{
 		return RT_ERROR;
 	}
-	gsm_param.csq = n;
-	lcd_msg.id		= LCD_MSG_ID_CSQ;
-	lcd_msg.info.payload[0] = n; /*接通*/
-	pscr->msg( (void*)&lcd_msg );
+	if( n != 0 )
+	{
+		gsm_csq = n;
+	}
 	return RT_EOK;
 }
 
@@ -790,16 +792,36 @@ rt_err_t pt_resp_ETCPIP( char *p, uint16_t len )
 ***********************************************************/
 rt_err_t pt_resp_IPOPENX( char *p, uint16_t len )
 {
-	LCD_MSG lcd_msg;
-	uint8_t i, stage = 0;
-	char	*psrc = p;
-	char	*pdst;
+	extern uint32_t gprs_ok_past_sec;
 
 	if( strstr( p, "CONNECT" ) != RT_NULL )
 	{
-		lcd_msg.id				= LCD_MSG_ID_GPRS;
-		lcd_msg.info.payload[0] = 1; /*接通*/
-		pscr->msg( (void*)&lcd_msg );
+		gprs_ok_past_sec	= rt_tick_get( ) / 100;
+		test_flag			|= TEST_BIT_GPRS;
+		rt_kprintf("\r\ntest_flag=%x",test_flag);
+		return RT_EOK;
+	}
+	return RT_ERROR;
+}
+
+/*
+   Platform Version:  MOCOR_09A_MP.W11.48_P1.08_Release
+   Project Version: SC6600L_6610_modem
+   MMI Version: V049P
+   Base Version: BASE_10A.W11.48
+   HW Version: SC6610_M10
+   Build Time: 2-18-2013 17:15:32
+   OK
+ */
+rt_err_t pt_resp_CGMR( char *p, uint16_t len )
+{
+	extern char gsm_ver[8];
+	char		*pdst = RT_NULL;
+
+	pdst = strstr( p, "V0" );
+	if( pdst != RT_NULL )
+	{
+		strncpy( gsm_ver, pdst + 2, 3 );
 		return RT_EOK;
 	}
 	return RT_ERROR;
@@ -848,13 +870,14 @@ static int protothread_gsm_power( struct pt *pt )
 		{ "AT+CPIN?\r\n",									pt_resp_CPIN,	 RT_TICK_PER_SECOND * 3,  10 },
 		{ "AT+CREG?\r\n",									pt_resp_CGREG,	 RT_TICK_PER_SECOND * 3,  10 },
 		{ "AT+CIMI\r\n",									pt_resp_CIMI,	 RT_TICK_PER_SECOND * 3,  1	 },
+		{ "AT+CGMR\r\n",									pt_resp_CGMR,	 RT_TICK_PER_SECOND * 3,  10 },
 		{ "AT+CGREG?\r\n",									pt_resp_CGREG,	 RT_TICK_PER_SECOND * 3,  10 },
 		{ "AT+CGATT?\r\n",									pt_resp_CGATT,	 RT_TICK_PER_SECOND * 3,  10 },
 		{ "AT+CGDCONT=1,\"IP\",\"CMNET\"\r\n",				pt_resp_STR_OK,	 RT_TICK_PER_SECOND * 10, 1	 },
 		{ "AT%ETCPIP=1,\"\",\"\"\r\n",						pt_resp_STR_OK,	 RT_TICK_PER_SECOND * 30, 1	 },
 		{ "AT%ETCPIP?\r\n",									pt_resp_ETCPIP,	 RT_TICK_PER_SECOND * 3,  1	 },
 		{ "AT%IOMODE=1,2,1\r\n",							pt_resp_STR_OK,	 RT_TICK_PER_SECOND * 3,  1	 },
-		{ "AT%IPOPENX=1,\"UDP\",\"60.28.50.210\",9131\r\n", pt_resp_IPOPENX, RT_TICK_PER_SECOND * 3,  1	 },
+		{ "AT%IPOPENX=1,\"TCP\",\"60.28.50.210\",9131\r\n", pt_resp_IPOPENX, RT_TICK_PER_SECOND * 3,  1	 },
 	};
 
 	static struct pt_timer	timer_gsm_power;
@@ -901,22 +924,18 @@ static int protothread_gsm_power( struct pt *pt )
 		//GPIO_SetBits(GPIOD,GPIO_Pin_9); /*关功放*/
 		gsm_state = GSM_AT;                             /*切换到AT状态*/
 	}
-	if(gsm_state == GSM_AT)		/*定时查CSQ*/
+	if( gsm_state == GSM_AT )                           /*定时查CSQ*/
 	{
-		
-		m66_write( &dev_gsm, 0,"AT+CSQ\r\n" , 8 );
-		rt_kprintf( "%08d gsm_send>%s", rt_tick_get( ), "AT+CSQ\r\n");
-		pt_timer_set( &timer_gsm_power, RT_TICK_PER_SECOND*3);
-		PT_WAIT_UNTIL( pt, pt_timer_expired( &timer_gsm_power ) || ( RT_EOK == pt_resp(pt_resp_CSQ )) );
-		if( pt_timer_expired( &timer_gsm_power ) ) /*超时*/
+		m66_write( &dev_gsm, 0, "AT+CSQ\r\n", 8 );
+		rt_kprintf( "%08d gsm_send>%s", rt_tick_get( ), "AT+CSQ\r\n" );
+		pt_timer_set( &timer_gsm_power, RT_TICK_PER_SECOND * 3 );
+		PT_WAIT_UNTIL( pt, pt_timer_expired( &timer_gsm_power ) || ( RT_EOK == pt_resp( pt_resp_CSQ ) ) );
+		if( pt_timer_expired( &timer_gsm_power ) )      /*超时*/
 		{
 			rt_kprintf( "\r\nAT+CSQ timeout\r\n" );
 		}
-		pt_timer_set( &timer_gsm_power, RT_TICK_PER_SECOND*3);
+		pt_timer_set( &timer_gsm_power, RT_TICK_PER_SECOND * 3 );
 		PT_WAIT_UNTIL( pt, pt_timer_expired( &timer_gsm_power ) );
-		
-		
-
 	}
 	if( gsm_state == GSM_POWEROFF )
 	{
@@ -981,7 +1000,6 @@ static void rt_thread_entry_gsm( void* parameter )
 			}
 		}
 		protothread_gsm_power( &pt_gsm_power );
-		
 
 		rt_thread_delay( RT_TICK_PER_SECOND / 20 );
 	}

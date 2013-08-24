@@ -149,7 +149,10 @@ static uint32_t  keycheck( void )
 	{
 		rt_kprintf( "\r\naux_in=%x", j );
 		aux_io_status = j;
-		aux_alarm_tick=5;
+		if(j)
+		{
+			aux_alarm_tick=5;
+		}	
 		
 	}
 	if(aux_alarm_tick)

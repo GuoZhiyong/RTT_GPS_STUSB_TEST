@@ -28,8 +28,8 @@ AUX_IO				PIN_IN[10] = {
 	{ GPIOE, GPIO_Pin_7,  71,  19 },    /*输入*/
 	{ GPIOC, GPIO_Pin_0,  95,  26 },    /*4.远光*/
 	{ GPIOC, GPIO_Pin_1,  88,  26 },    /*5.车门*/
-	//{ GPIOA, GPIO_Pin_1,  116, 19 },    /*6.喇叭 定义为AD输入*/
-	//{ GPIOC, GPIO_Pin_3,  109, 19 },    /*7.左转 定义为AD输入*/
+	{ GPIOA, GPIO_Pin_1,  116, 19 },    /*6.喇叭 定义为AD输入*/
+	{ GPIOC, GPIO_Pin_3,  109, 19 },    /*7.左转 定义为AD输入*/
 	{ GPIOC, GPIO_Pin_2,  102, 19 },    /*8.右转*/
 	{ GPIOE, GPIO_Pin_11, 95,  19 },    /*9.刹车*/
 	{ GPIOE, GPIO_Pin_10, 88,  19 },    /*10.雨刷*/
@@ -203,14 +203,14 @@ static print_testresult( void )
 	{
 		if( test_df_error )
 		{
-			printer( "SerialFlash 异常\r\n" );
+			printer( "Flash 异常\r\n" );
 		} else
 		{
-			printer( "SerialFlash 正常\r\n" );
+			printer( "Flash 正常\r\n" );
 		}
 	}else
 	{
-		printer( "SerialFlash 测试未完成\r\n" );
+		printer( "Flash 测试未完成\r\n" );
 	}
 
 	if( rtc_ok )
@@ -484,10 +484,12 @@ static void timetick( unsigned int systick )
 				}
 			}
 			print_testresult_count++;	// 500ms计数
+			/*取消自动打印
 			if(print_testresult_count==10)
 			{
 				print_testresult();
 			}
+			*/
 		}
 	}
 

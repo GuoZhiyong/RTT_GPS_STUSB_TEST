@@ -84,7 +84,7 @@ extern uint32_t iccard_beep_timeout;
 
 extern uint32_t Frequency;
 
-extern uint8_t 	print_testresult_count;
+extern uint32_t 	print_testresult_count;
 
 
 void ad_init( void );

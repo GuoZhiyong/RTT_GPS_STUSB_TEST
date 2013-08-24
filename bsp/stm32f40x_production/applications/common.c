@@ -119,7 +119,7 @@ uint32_t		mems_alarm_tick = 0;
 uint8_t			iccard_status = 0;
 uint8_t			iccard_value = 0;
 
-uint8_t 	print_testresult_count=0;
+uint32_t 	print_testresult_count=0;
 
 
 /*处理自检状态的消息*/

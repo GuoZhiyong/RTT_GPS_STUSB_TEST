@@ -366,8 +366,9 @@ static rt_err_t m66_init( rt_device_t dev )
 	GPIO_InitStructure.GPIO_OType	= GPIO_OType_PP;
 	GPIO_InitStructure.GPIO_Pin		= GPIO_Pin_9;
 	GPIO_Init( GPIOD, &GPIO_InitStructure );
-	//GPIO_SetBits( GPIOD, GPIO_Pin_9 );
-	GPIO_ResetBits( GPIOD, GPIO_Pin_9 ); /*开功放*/
+	//GPIO_SetBits( GPIOD, GPIO_Pin_9 );	/*关功放*/
+	GPIO_ResetBits( GPIOD, GPIO_Pin_9 );	/*开功放*/
+
 
 /*uart4 管脚设置*/
 
@@ -638,6 +639,11 @@ rt_err_t pt_resp_TTS_OK( char *p, uint16_t len )
 	if( pfind )
 	{
 		tts_playing = 0;
+		if(test_flag==TEST_BIT_ALL)
+		{
+			print_testresult_count=9;
+		}
+		GPIO_SetBits( GPIOD, GPIO_Pin_9 ); /*关功放*/
 		return RT_EOK; /*找到了*/
 	}
 	return RT_ERROR;
@@ -993,6 +999,7 @@ static void rt_thread_entry_gsm( void* parameter )
 			res = rt_mb_recv( &mb_tts, (rt_uint32_t*)&ptts, 0 );
 			if( res == RT_EOK )
 			{
+				GPIO_ResetBits( GPIOD, GPIO_Pin_9 ); /*开功放*/
 				rt_kprintf( "\r\nTTS(%d)>%s", strlen( ptts ), ptts );
 				m66_write( &dev_gsm, 0, ptts, strlen( ptts ) );
 				tts_playing = 1;

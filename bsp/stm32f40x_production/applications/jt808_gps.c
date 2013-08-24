@@ -42,14 +42,14 @@ static LCD_MSG	lcd_msg;
 
 uint32_t		gps_sec_count = 0;
 
-uint32_t		gps_fixed_sec=0;
+uint32_t		gps_fixed_sec = 0;
 GPS_STATUS		gps_status;
 uint32_t		jt808_alarm = 0;
 
 uint8_t			gps_av		= 'V';
 uint8_t			gps_year	= 0, gps_month = 0, gps_day = 0;
 
-uint8_t			gps_hour	= 0, gps_minute = 0, gps_sec = 0;
+uint8_t			gps_hour = 0, gps_minute = 0, gps_sec = 0;
 
 /**/
 uint8_t process_rmc( uint8_t * pinfo )
@@ -98,6 +98,10 @@ uint8_t process_rmc( uint8_t * pinfo )
 	if( ( buf[0] == 'A' ) || ( buf[0] == 'V' ) )
 	{
 		gps_av = buf[0];
+	}
+	if( gps_av == 'V' )
+	{
+		return;
 	}
 
 /*Î³¶È´¦Àíddmm.mmmmmm*/
@@ -245,17 +249,17 @@ uint8_t process_rmc( uint8_t * pinfo )
 			}
 		}
 	}
-	gps_year=year;
-	gps_month=mon;
-	gps_day=day;
+	gps_year	= year;
+	gps_month	= mon;
+	gps_day		= day;
 	if( gps_fixed_sec == 0 )
 	{
 		time_set( gps_hour, gps_minute, gps_sec );
 		date_set( gps_year, gps_month, gps_day );
-		gps_fixed_sec = gps_sec_count;
-		test_flag|=TEST_BIT_GPS;
-		rt_kprintf("\r\ntest_flag=%x",test_flag);
-		rt_kprintf("\r\n>gps fixed sec=%d",gps_fixed_sec);
+		gps_fixed_sec	= gps_sec_count;
+		test_flag		|= TEST_BIT_GPS;
+		rt_kprintf( "\r\ntest_flag=%x", test_flag );
+		rt_kprintf( "\r\n>gps fixed sec=%d", gps_fixed_sec );
 	}
 
 	return 0;
@@ -335,7 +339,6 @@ uint8_t process_gga( uint8_t * pinfo )
 	}
 	return 9;
 }
-
 
 /***********************************************************
 * Function:

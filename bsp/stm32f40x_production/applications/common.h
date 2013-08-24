@@ -40,6 +40,9 @@
 #define TEST_BIT_ALL 0x0000007F
 
 
+
+
+
 /*
 
    #define TEST_BIT_CAM1_PASS		0x80000000
@@ -75,10 +78,14 @@ extern uint8_t	ctrlbit_buzzer;
 extern uint32_t mems_alarm_tick;
 
 extern uint8_t	iccard_status;
+extern uint8_t			iccard_value;
 
 extern uint32_t iccard_beep_timeout;
 
 extern uint32_t Frequency;
+
+extern uint8_t 	print_testresult_count;
+
 
 void ad_init( void );
 

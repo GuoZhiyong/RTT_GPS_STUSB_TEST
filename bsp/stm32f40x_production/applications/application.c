@@ -92,7 +92,7 @@ void rt_init_thread_entry( void* parameter )
 				rt_kprintf("\r\ntest_flag=%x",test_flag);
 			}
 		}
-		rt_thread_delay( RT_TICK_PER_SECOND * 4 );
+		rt_thread_delay( RT_TICK_PER_SECOND * 2 );
 	}
 }
 

@@ -128,7 +128,9 @@ const unsigned char res_iccard_err[] = {
 
 DECL_BMP( 24, 8, res_iccard_err );
 
-static char cam_ch[4] = { 0x20, 0x20, 0x20, 0x20 };
+static char		cam_ch[4] = { 0x20, 0x20, 0x20, 0x20 };
+
+static uint8_t	tick_500ms = 0;
 
 /*要显示的状态信息*/
 
@@ -147,7 +149,18 @@ static print_testresult( void )
 	char	*gps_mode[4] = { "  ", "BD", "GP", "GN" };
 	char	buf[64];
 	char	i;
-	printer( "************测试结果************\r\n\n" );
+
+/*关掉所有外设*/
+
+	GPIO_ResetBits( GPIOD, GPIO_Pin_10 );  /*关掉gps*/
+
+	GPIO_ResetBits( GPIOD, GPIO_Pin_13 );			/*关掉gsm*/
+	GPIO_ResetBits( GPIOD, GPIO_Pin_12 );
+
+	GPIO_ResetBits( GPIOB, GPIO_Pin_8 );		/*关掉CAM*/
+
+	
+	printer( "      ******测试结果******      \r\n\n" );
 
 	sprintf( buf, "打印时间:20%02d/%02d/%02d %02d:%02d:%02d\r\n", gps_year, gps_month, gps_day, gps_hour, gps_minute, gps_sec );
 	printer( buf );
@@ -155,7 +168,7 @@ static print_testresult( void )
 	sprintf( buf, "测试用时:%02d:%02d\r\n", rt_tick_get( ) / 100 / 60, rt_tick_get( ) / 100 % 60 );
 	printer( buf );
 
-	printer( "\r\n\n\nBDGPS- " );
+	printer( "\r\n\nBDGPS- " );
 
 	if( jt808_alarm & BIT_ALARM_GPS_ERR )
 	{
@@ -179,7 +192,7 @@ static print_testresult( void )
 	sprintf( buf, "    定位模式:%s 星数:%d\r\n", gps_mode[gps_status.mode], gps_status.NoSV );
 	printer( buf );
 
-	sprintf( buf, "\r\n\n\nGSM-M66 VER:%s\r\n", gsm_ver );
+	sprintf( buf, "\r\n\nGSM-M66 VER:%s\r\n", gsm_ver );
 	printer( buf );
 	sprintf( buf, "    登网用时:%02d:%02d\r\n", gprs_ok_past_sec / 60, gprs_ok_past_sec % 60 );
 	printer( buf );
@@ -220,16 +233,16 @@ static print_testresult( void )
 	{
 		if( test_cam_flag[0] == 1 )
 		{
-			printer("拍照 成功\r\n");
+			printer( "拍照 正常\r\n" );
 		}else
 		{
-			printer("拍照 失败\r\n");
+			printer( "拍照 异常\r\n" );
 		}
 	}else
 	{
 		printer( "拍照测试未完成\r\n" );
 	}
-	
+
 	if( test_flag & TEST_BIT_ICCARD )
 	{
 		printer( "IC卡 正常\r\n" );
@@ -239,6 +252,7 @@ static print_testresult( void )
 	}
 
 	printer( "\r\n\n\n\n\n\n\n\n\n" );
+	
 }
 
 /*显示状态信息*/
@@ -263,8 +277,11 @@ void showinfo( void )
 	if( gps_fixed_sec )
 	{
 		sprintf( buf, "%02d:%02d", gps_fixed_sec / 60, gps_fixed_sec % 60 );
-		lcd_asc0608( 0, 8, buf, LCD_MODE_SET );
+	}else
+	{
+		sprintf( buf, "%02d:%02d", gps_sec_count / 60, gps_sec_count % 60 );
 	}
+	lcd_asc0608( 0, 8, buf, LCD_MODE_SET );
 
 	if( jt808_alarm & ( BIT_ALARM_GPS_ERR | BIT_ALARM_GPS_OPEN | BIT_ALARM_GPS_SHORT ) )
 	{
@@ -297,15 +314,14 @@ void showinfo( void )
 	}
 	lcd_asc0608( 44, 16, gsm_ver, LCD_MODE_SET );
 
-	if( iccard_status == 1 )
+	if( iccard_value == 1 )
 	{
-		lcd_bitmap( 122 - 6 * 4, 24, &bmp_res_iccard_insert, LCD_MODE_SET );
-	}else if( iccard_status == 2 )
+		lcd_asc0608( 98, 24, "IC", LCD_MODE_SET );
+	}else if( iccard_value == 2 )
 	{
-		lcd_bitmap( 122 - 6 * 4, 24, &bmp_res_iccard_err, LCD_MODE_SET );
+		lcd_asc0608( 98, 24, "IC", LCD_MODE_INVERT );
 	}else
 	{
-		lcd_bitmap( 122 - 6 * 4, 24, &bmp_res_iccard_empty, LCD_MODE_SET );
 	}
 
 	if( rtc_ok )
@@ -421,20 +437,22 @@ static void timetick( unsigned int systick )
 		ctrlbit_status = ( ctrlbit_printer_3v3_on | ctrlbit_buzzer );
 	}
 
-	if( IC_Card_Checked ^ iccard_status )                   /*有状态变化*/
+	if( IC_Card_Checked ^ iccard_status )   /*有状态变化*/
 	{
 		iccard_beep_timeout = 5;
-		if( IC_Card_Checked == 0 )                          /*卡拔出*/
+		if( IC_Card_Checked == 0 )          /*卡拔出*/
 		{
 			//i			= sprintf( buf, "AT%%TTS=2,3,5,\"4943BFA8B0CEB3F6\"\r\n\0" );   /*IC卡拔出*/
 			test_flag |= TEST_BIT_ICCARD;
-			rt_kprintf("\r\ntest_flag=%x",test_flag);
-		}else if( IC_Card_Checked == 1 )                    /*卡插入正确*/
+			rt_kprintf( "\r\ntest_flag=%x", test_flag );
+		}else if( IC_Card_Checked == 1 )    /*卡插入正确*/
 		{
 			//i = sprintf( buf, "AT%%TTS=2,3,5,\"4943BFA8D5FDB3A3\"\r\n\0" );             /*IC卡正常*/
-		}else if( IC_Card_Checked == 2 )                    /*卡插入错误*/
+			iccard_value = 1;
+		}else if( IC_Card_Checked == 2 )    /*卡插入错误*/
 		{
 			//i = sprintf( buf, "AT%%TTS=2,3,5,\"4943BFA8B4EDCEF3\"\r\n\0" );             /*IC卡错误*/
+			iccard_value = 2;
 		}
 
 		//pmsg = rt_malloc( i );
@@ -444,13 +462,38 @@ static void timetick( unsigned int systick )
 		//	rt_mb_send( &mb_tts, (rt_uint32_t)pmsg );
 		//}
 		iccard_status = IC_Card_Checked;
-//		showinfo( );
+	}
+
+	tick_500ms++;
+	if( tick_500ms == 10 )
+	{
+		showinfo( );
+		tick_500ms = 0;
+
+		if( test_flag == TEST_BIT_ALL ) /*全部测试完成,播报*/
+		{
+			if( print_testresult_count == 0 )
+			{
+				i		= sprintf( buf, "AT%%TTS=2,3,5,\"B2E2CAD4CDEAB3C9\"\r\n" );
+				buf[i]	= 0;
+				pmsg	= rt_malloc( i + 1 );
+				if( pmsg != RT_NULL )
+				{
+					memcpy( pmsg, buf, i + 1 );
+					rt_mb_send( &mb_tts, (rt_uint32_t)pmsg );
+				}
+			}
+			print_testresult_count++;	// 500ms计数
+			if(print_testresult_count==10)
+			{
+				print_testresult();
+			}
+		}
 	}
 
 	offset++;
-	if( offset >= 10 )
+	if( offset >= 20 )
 	{
-		showinfo( );
 		offset = 0;
 		if( sec & 0x01 ) /*输出控制*/
 		{
@@ -487,45 +530,6 @@ static void msg( void *plcdmsg )
 			pscr->show( &scr_1_idle );
 			return;
 		}
-	}
-
-	if( IC_Card_Checked ^ iccard_status )                   /*有状态变化*/
-	{
-		iccard_beep_timeout = 5;
-		if( IC_Card_Checked == 0 )                          /*卡拔出*/
-		{
-			//i			= sprintf( buf, "AT%%TTS=2,3,5,\"4943BFA8B0CEB3F6\"\r\n\0" );   /*IC卡拔出*/
-			test_flag |= TEST_BIT_ICCARD;
-			rt_kprintf("\r\ntest_flag=%x",test_flag);
-		}else if( IC_Card_Checked == 1 )                    /*卡插入正确*/
-		{
-			//i = sprintf( buf, "AT%%TTS=2,3,5,\"4943BFA8D5FDB3A3\"\r\n\0" );             /*IC卡正常*/
-		}else if( IC_Card_Checked == 1 )                    /*卡插入错误*/
-		{
-			//i = sprintf( buf, "AT%%TTS=2,3,5,\"4943BFA8B4EDCEF3\"\r\n\0" );             /*IC卡错误*/
-		}
-
-		//pmsg = rt_malloc( i );
-		//if( pmsg != RT_NULL )
-		//{
-		//	memcpy( pmsg, buf, i );
-		//	rt_mb_send( &mb_tts, (rt_uint32_t)pmsg );
-		//}
-
-		iccard_status = IC_Card_Checked;
-	}
-
-	if( test_flag == TEST_BIT_ALL )
-	{
-		i		= sprintf( buf, "AT%%TTS=2,3,5,\"B2E2CAD4CDEAB3C9\"\r\n" );
-		buf[i]	= 0;
-		pmsg	= rt_malloc( i + 1 );
-		if( pmsg != RT_NULL )
-		{
-			memcpy( pmsg, buf, i + 1 );
-			rt_mb_send( &mb_tts, (rt_uint32_t)pmsg );
-		}
-		print_testresult( );
 	}
 
 	showinfo( );

@@ -30,6 +30,24 @@ static void showinfo( void )
 	{
 		lcd_fill(0);
 		lcd_text12( 0, 0, "液晶按键测试", 12, LCD_MODE_SET );
+		if( keycheck & 0x08 )
+		{
+			buf[0] = '1';
+		}
+		if( keycheck & 0x04 )
+		{
+			buf[1] = '1';
+		}
+		if( keycheck & 0x02 )
+		{
+			buf[2] = '1';
+		}
+		if( keycheck & 0x01 )
+		{
+			buf[3] = '1';
+		}
+		lcd_text12( 48, 12, buf, 4, LCD_MODE_SET );
+		
 		if( keycheck == 0x0F )      /*四个键按下*/
 		{
 			pscr = &scr_1_idle;

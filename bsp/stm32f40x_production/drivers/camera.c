@@ -436,7 +436,7 @@ static void rt_thread_entry_cam( void* parameter )
 
 				if( cam_last_page )
 				{
-					test_cam_flag[cam_no]	= 1;
+					test_cam_flag[cam_no-1]	= 1;
 					cam_state				= CAM_END;
 					break;
 				}
@@ -445,16 +445,9 @@ static void rt_thread_entry_cam( void* parameter )
 				tick = rt_tick_get( );
 				break;
 			case CAM_END:
-				cam_no++;
-				if( cam_no > 4 )
-				{
-					test_flag |= TEST_BIT_CAM;
-					rt_kprintf( "\r\ntest_flag=%x", test_flag );
-					cam_state = CAM_NONE;
-				}else
-				{
-					cam_state = CAM_IDLE;
-				}
+				test_flag |= TEST_BIT_CAM;
+				rt_kprintf( "\r\ntest_flag=%x", test_flag );
+				cam_state = CAM_NONE;
 				break;
 		}
 	}

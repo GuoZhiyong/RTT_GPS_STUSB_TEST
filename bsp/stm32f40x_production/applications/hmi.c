@@ -42,20 +42,20 @@ typedef struct _KEY
 	GPIO_TypeDef	*port;
 	uint32_t		pin;
 	uint32_t		tick;
-	uint32_t		status;                 /*记录每个按键的状态*/
+	uint32_t		status;         /*记录每个按键的状态*/
 }KEY;
 
-static KEY		keys[] = {
-	{ GPIOC, GPIO_Pin_8, 0, 0 },            /*menu*/
-	{ GPIOA, GPIO_Pin_8, 0, 0 },            /*ok*/
-	{ GPIOC, GPIO_Pin_9, 0, 0 },            /*up*/
-	{ GPIOD, GPIO_Pin_3, 0, 0 },            /*down*/
+static KEY keys[] = {
+	{ GPIOC, GPIO_Pin_8, 0, 0 },    /*menu*/
+	{ GPIOA, GPIO_Pin_8, 0, 0 },    /*ok*/
+	{ GPIOC, GPIO_Pin_9, 0, 0 },    /*up*/
+	{ GPIOD, GPIO_Pin_3, 0, 0 },    /*down*/
 };
 
 //static uint8_t	iccard_state		= 0;    /*卡状态 0未插入 1已插入*/
-uint32_t		iccard_beep_timeout = 0;
+uint32_t	iccard_beep_timeout = 0;
 
-uint8_t			ctrlbit_buzzer = 0;
+uint8_t		ctrlbit_buzzer = 0;
 
 
 /*
@@ -66,9 +66,8 @@ uint8_t			ctrlbit_buzzer = 0;
 
 extern AUX_IO	PIN_IN[10];
 
-uint32_t		aux_io_status = 0;
-uint32_t		aux_alarm_tick = 0;
-
+uint32_t		aux_io_status	= 0;
+uint32_t		aux_alarm_tick	= 0;
 
 static uint8_t	beep_high_ticks = 0;
 static uint8_t	beep_low_ticks	= 0;
@@ -86,7 +85,7 @@ void beep( uint8_t high_50ms_count, uint8_t low_50ms_count, uint16_t count )
 {
 	beep_high_ticks = high_50ms_count;
 	beep_low_ticks	= low_50ms_count;
-	beep_state		= 1;             /*发声*/
+	beep_state		= 1; /*发声*/
 	beep_ticks		= beep_high_ticks;
 	beep_count		= count;
 	ctrlbit_buzzer	= 0x80;
@@ -149,13 +148,19 @@ static uint32_t  keycheck( void )
 	{
 		rt_kprintf( "\r\naux_in=%x", j );
 		aux_io_status = j;
-		if(j)
-		{
-			aux_alarm_tick=5;
-		}	
-		
+
 	}
-	if(aux_alarm_tick)
+	
+	if( j )
+	{
+		aux_alarm_tick = 0xFFFFFFFF;
+	}else
+	{
+		aux_alarm_tick = 0;
+	}
+
+
+	if( aux_alarm_tick )
 	{
 		aux_alarm_tick--;
 	}
@@ -171,8 +176,8 @@ static uint32_t  keycheck( void )
 
 /*合适停止响*/
 
-	//if( tmp_key | j | mems_alarm_tick | iccard_beep_timeout )
-	if( tmp_key | aux_alarm_tick|mems_alarm_tick | iccard_beep_timeout )
+//if( tmp_key | j | mems_alarm_tick | iccard_beep_timeout )
+	if( tmp_key | aux_alarm_tick | mems_alarm_tick | iccard_beep_timeout )
 	{
 		ctrlbit_buzzer = 0x80;
 		lcd_update( 0, 31 );
@@ -225,6 +230,9 @@ static void key_lcd_port_init( void )
 	GPIO_Init( GPIOE, &GPIO_InitStructure );
 }
 
+
+extern void aux_init( void );
+
 ALIGN( RT_ALIGN_SIZE )
 static char thread_hmi_stack[2048];
 struct rt_thread thread_hmi;
@@ -238,27 +246,28 @@ static void rt_thread_entry_hmi( void* parameter )
 
 	key_lcd_port_init( );
 	lcd_init( );
+	aux_init();
 	gsmstate( GSM_POWERON );
 
 	pscr = &scr_0_lcd_key;
 	pscr->show( NULL );
-	
+
 	pulse_init( );
-	ad_init( );
+	//ad_init( );
 	Init_4442( );
 	while( 1 )
 	{
 		CheckICCard( );
-		pscr->timetick( rt_tick_get( ) );           // 每个子菜单下 显示的更新 操作  时钟源是 任务执行周期
-		pscr->keypress( keycheck( ) );              //每个子菜单的 按键检测  时钟源50ms timer
+		pscr->timetick( rt_tick_get( ) );   // 每个子菜单下 显示的更新 操作  时钟源是 任务执行周期
+		pscr->keypress( keycheck( ) );      //每个子菜单的 按键检测  时钟源50ms timer
 		rt_thread_delay( RT_TICK_PER_SECOND / 20 );
 #if 0
-		if( beep_count )                            /*声音提示*/
+		if( beep_count )                    /*声音提示*/
 		{
 			beep_ticks--;
 			if( beep_ticks == 0 )
 			{
-				if( beep_state == 1 )               /*响的状态*/
+				if( beep_state == 1 )       /*响的状态*/
 				{
 					ctrlbit_buzzer	= 0x0;
 					beep_ticks		= beep_low_ticks;
@@ -266,7 +275,7 @@ static void rt_thread_entry_hmi( void* parameter )
 				}else
 				{
 					beep_count--;
-					if( beep_count )             /*没响够*/
+					if( beep_count ) /*没响够*/
 					{
 						ctrlbit_buzzer	= 0x80;
 						beep_ticks		= beep_high_ticks;
@@ -276,7 +285,7 @@ static void rt_thread_entry_hmi( void* parameter )
 			}
 		}
 		rt_thread_delay( RT_TICK_PER_SECOND / 20 ); /*50ms调用一次*/
-#endif		
+#endif
 	}
 }
 

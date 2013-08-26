@@ -119,6 +119,7 @@ extern SCR scr_0_lcd_key;
 extern SCR scr_1_idle;
 extern SCR scr_2_call;
 extern SCR scr_3_bdupgrade;
+extern SCR scr_4_bdcheck;
 
 extern uint32_t mems_alarm_tick;
 

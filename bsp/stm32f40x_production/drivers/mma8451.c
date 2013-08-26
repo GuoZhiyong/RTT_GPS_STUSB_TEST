@@ -633,6 +633,8 @@ void EXTI9_5_IRQHandler( void )
 		}
 		rt_kprintf("\nINT=%02x %02x %02x\n",value1,value2,value3);
 		//rt_kprintf("\nINT=%02x\n",value2);
+		mems_status=SUCCESS;
+		//test_flag|=TEST_BIT_MEMS;
 		EXTI_ClearITPendingBit( EXTI_Line5 );
 	}
 	rt_interrupt_leave( );
@@ -903,7 +905,7 @@ static uint8_t mma8451_config( uint16_t param1, uint16_t param2 )
 	{
 		goto lbl_mma8451_config_err;
 	}
-	mems_status=SUCCESS;
+	//mems_status=SUCCESS;
 	test_flag|=TEST_BIT_MEMS;
 	rt_kprintf("\r\ntest_flag=%x",test_flag);
 	return ERR_NONE;

@@ -82,8 +82,8 @@
 unsigned char			printer_data[PRINTER_DATA_SIZE];
 struct rt_ringbuffer	rb_printer_data;
 
+uint8_t					ctrlbit_printer_3v3_on = 0;
 
-uint8_t ctrlbit_printer_3v3_on=0;
 
 /*
    要打印的图案 24x24dot 24*3=72byte
@@ -241,7 +241,7 @@ static void printer_port_init( void )
 	//gpio_init.GPIO_Pin = PRINTER_POWER_PIN_3V3;
 	//GPIO_Init( PRINTER_POWER_PORT_3V3, &gpio_init );
 	//GPIO_SetBits( PRINTER_POWER_PORT_3V3, PRINTER_POWER_PIN_3V3 );
-	ctrlbit_printer_3v3_on=0x20;
+	ctrlbit_printer_3v3_on = 0x20;
 
 	gpio_init.GPIO_Pin	= PHE_PIN;
 	gpio_init.GPIO_Mode = GPIO_Mode_IN;
@@ -315,15 +315,16 @@ static void printer_save_param( void )
 {
 }
 
-#define PRINTER_IDLE					1
-#define PRINTER_GET_DATA_HEAT_1_3		2
-#define PRINTER_STOP_HEAT_1_3_HEAT_4_6	3
-#define PRINTER_STOP_HEAT_4_6			4
-#define PRINTER_STEP_DOTROW1			5
-#define PRINTER_STEP_DOTROW2			6
-#define PRINTER_STEP_DOTROW3			7
-#define PRINTER_STEP_DOTROW4			8
-#define PRINTER_STEP_DOTROWEND			9
+#define PRINTER_IDLE				1
+#define PRINTER_GET_DATA_HEAT_1_3	2
+#define PRINTER_STOP_HEAT_1_3		3
+#define PRINTER_HEAT_4_6			4
+#define PRINTER_STOP_HEAT_4_6		5
+#define PRINTER_STEP_DOTROW1		6
+#define PRINTER_STEP_DOTROW2		7
+#define PRINTER_STEP_DOTROW3		8
+#define PRINTER_STEP_DOTROW4		9
+#define PRINTER_STEP_DOTROWEND		10
 
 __IO uint32_t	timebase_1ms		= 0;
 uint8_t			print_dotrow		= 0;    /*当前打印的点阵行*/
@@ -349,7 +350,7 @@ void TIM3_IRQHandler( void )
 	if( GPIO_ReadInputDataBit( PHE_PORT, PHE_PIN ) )
 	{
 		GPIO_ResetBits( PRINTER_POWER_PORT_5V, PRINTER_POWER_PIN_5V );
-		fprinting=0;
+		fprinting = 0;
 		return;
 	}
 	timebase_1ms++;
@@ -382,15 +383,23 @@ void TIM3_IRQHandler( void )
 			GPIO_ResetBits( LAT_PORT, LAT_PIN );
 			GPIO_SetBits( LAT_PORT, LAT_PIN );
 			GPIO_SetBits( STB1_3_PORT, STB1_3_PIN );    /*加热*/
-			print_stage		= PRINTER_STOP_HEAT_1_3_HEAT_4_6;
+			print_stage		= PRINTER_STOP_HEAT_1_3;
 			timebase_1ms	= 0;                        /*启动定时*/
 			break;
-		case PRINTER_STOP_HEAT_1_3_HEAT_4_6:
+		case PRINTER_STOP_HEAT_1_3:
 			if( timebase_1ms < printer_param.heat_delay[printer_param.gray_level] )
 			{
 				break;
 			}
 			GPIO_ResetBits( STB1_3_PORT, STB1_3_PIN );
+			print_stage		= PRINTER_HEAT_4_6;
+			timebase_1ms	= 0;
+			break;
+		case PRINTER_HEAT_4_6:
+			if( timebase_1ms < 30 )
+			{
+				break;
+			}
 			GPIO_SetBits( STB4_6_PORT, STB4_6_PIN );
 			print_stage		= PRINTER_STOP_HEAT_4_6;
 			timebase_1ms	= 0;
@@ -861,7 +870,7 @@ static rt_err_t printer_init( rt_device_t dev )
 static rt_err_t printer_open( rt_device_t dev, rt_uint16_t oflag )
 {
 	//GPIO_SetBits( PRINTER_POWER_PORT_3V3, PRINTER_POWER_PIN_3V3 );
-	ctrlbit_printer_3v3_on=0x20;
+	ctrlbit_printer_3v3_on = 0x20;
 	return RT_EOK;
 }
 
@@ -965,7 +974,7 @@ static rt_err_t printer_control( rt_device_t dev, rt_uint8_t cmd, void *arg )
 static rt_err_t printer_close( rt_device_t dev )
 {
 	//GPIO_ResetBits( PRINTER_POWER_PORT_3V3, PRINTER_POWER_PIN_3V3 );
-	ctrlbit_printer_3v3_on=0;
+	ctrlbit_printer_3v3_on = 0;
 	GPIO_ResetBits( PRINTER_POWER_PORT_5V, PRINTER_POWER_PIN_5V );
 	return RT_EOK;
 }

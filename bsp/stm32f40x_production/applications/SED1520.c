@@ -337,49 +337,6 @@ void lcd_init( void )
 	lcd_out_ctl( LCD_SET_COL, 3 );
 }
 
-/***********************************************************
-* Function:
-* Description:
-* Input:
-* Input:
-* Output:
-* Return:
-* Others:
-***********************************************************/
-
-#if 0
-void lcd_update( const unsigned char top, const unsigned char bottom )
-{
-	unsigned char	x;
-	unsigned char	y;
-	unsigned char	yt;
-	unsigned char	yb;
-	unsigned char	*colptr;
-
-	/* setup bytes of range */
-	yb	= bottom >> 3;
-	yt	= top >> 3;
-
-	for( y = yt; y <= yb; y++ )
-	{
-		lcd_out_ctl( LCD_SET_PAGE + y, 3 ); /* set page */
-		lcd_out_ctl( LCD_SET_COL + 0, 3 );
-		colptr = &l_display_array[y][0];
-
-		for( x = 0; x < LCD_X_BYTES; x++ )
-		{
-			if( x < LCD_X_BYTES / 2 )
-			{
-				lcd_out_dat( *colptr++, 1 );
-			} else
-			{
-				lcd_out_dat( *colptr++, 2 );
-			}
-		}
-	}
-}
-
-#endif
 
 /**/
 void lcd_update( const unsigned char top, const unsigned char bottom )

@@ -427,7 +427,7 @@ static void rt_thread_entry_gps( void* parameter )
 				}
 			}
 		}
-		rt_thread_delay( RT_TICK_PER_SECOND / 20 );
+		rt_thread_delay( RT_TICK_PER_SECOND / 100 );
 		if( ( rt_tick_get( ) - tick_lastrx ) > RT_TICK_PER_SECOND * 10 )    /*长时间没有语句输出,模块损坏*/
 		{
 			rt_kprintf( "%d>gps no output\r\n", rt_tick_get( ) );
@@ -543,6 +543,130 @@ void thread_gps_check_ver( void* parameter )
 {
 	void		( *msg )( void *p );
 	int			count = 0;
+	rt_uint8_t	*pdata; /*数据*/
+
+	char		buf[32];
+	rt_err_t	res;
+	LENGTH_BUF	uart_buf;
+
+	uint8_t		ver[3]; /*版本*/
+	uint32_t	model;  /*型号*/
+	uint8_t		ok = 0; /*是否执行正确*/
+
+	uint8_t		cmd_reset[11] = { 0x40, 0x34, 0xC0, 0x00, 0x34, 0x00, 0x01, 0x84, 0x6B, 0x0D, 0x0A };
+
+	msg = parameter;
+
+	msg( "I正在查询..." );
+/*尝试停止gps线程*/
+	//GPIO_ResetBits( GPIOD, GPIO_Pin_10 );  /*先关模块*/
+	while( rt_thread_suspend( &thread_gps ) != RT_EOK )
+	{
+		rt_kprintf( "S" );
+		rt_thread_delay( 10 );
+		count++;
+		if( count > 200 )
+		{
+			msg( "E查询版本失败" );
+			//GPIO_SetBits( GPIOD, GPIO_Pin_10 );  /*开模块*/
+			return;
+		}
+	}
+	rt_kprintf( "\n挂起线程" );
+	//GPIO_SetBits( GPIOD, GPIO_Pin_10 );  /*开模块*/
+	//rt_thread_delay( RT_TICK_PER_SECOND);
+
+/*先清除已有的数据，再发送*/
+	while( rt_mq_recv( &mq_gps, (void*)&uart_buf, NEMA_SIZE, 0 ) == RT_EOK )
+	{
+		rt_thread_delay( RT_TICK_PER_SECOND / 10 );
+	}
+
+/*进入升级状态*/
+	memcpy( buf, "\x40\x30\xC0\x00\x03\x00\x01\x34\x21\x0D\x0A", 11 );
+	dev_gps_write( &dev_gps, 0, buf, 11 );
+	rt_thread_delay( RT_TICK_PER_SECOND );
+/*版本查询*/
+	count = 0;
+	while( rt_mq_recv( &mq_gps, (void*)&uart_buf, NEMA_SIZE, 0 ) == RT_EOK )
+	{
+		rt_thread_delay( RT_TICK_PER_SECOND / 10 );
+	}
+	for( count = 0; count < 5; count++ )
+	{
+		dev_gps_write( &dev_gps, 0, "\x40\x10\xC0\x00\x10\x00\x01\xC2\x84\x0D\x0A", 11 );
+		res = rt_mq_recv( &mq_gps, (void*)&uart_buf, NEMA_SIZE, RT_TICK_PER_SECOND * 5 );
+		if( res == RT_EOK )                                             //收到一包数据
+		{
+			if( ( uart_buf.wr == 15 ) && ( uart_buf.body[4] == 0x02 ) ) /*进入升级状态*/
+			{
+				ver[0]	= ( uart_buf.body[7] & 0xf0 ) >> 4;
+				ver[1]	= ( uart_buf.body[7] & 0xf );
+				ver[2]	= uart_buf.body[8];
+				ok++;
+				break;
+			}else
+			{
+				rt_kprintf( "bd>%s", uart_buf.body );
+			}
+		}
+	}
+
+	if( ok == 0 )
+	{
+		msg( "E查询模块版本错误" );
+		goto lbl_check_ver_err;
+	}
+	for( count = 0; count < 5; count++ )
+	{
+		dev_gps_write( &dev_gps, 0, "\x40\x16\xC0\x00\x16\x00\x01\x22\xE3\x0D\x0A", 11 );
+		res = rt_mq_recv( &mq_gps, (void*)&uart_buf, NEMA_SIZE, RT_TICK_PER_SECOND * 5 );
+		if( res == RT_EOK )                           //收到一包数据
+		{
+			if( ( uart_buf.wr == 28 ) && ( uart_buf.body[5] == 0x0 ) )
+			{
+				model = ( uart_buf.body[6] << 24 ) | ( uart_buf.body[7] << 16 ) | ( uart_buf.body[8] << 8 ) | ( uart_buf.body[9] );
+				ok++;
+				break;
+			}else
+			{
+				rt_kprintf( "bd>%s", uart_buf.body );
+			}
+		}
+	}
+
+	if( ok )
+	{
+		sprintf( buf, "E模块TD%d (%d.%d.%d)", model / 10, ver[0], ver[1], ver[2] );
+		msg( buf );
+	}else
+	{
+		msg( "E查询模块型号错误" );
+	}
+lbl_check_ver_err:
+
+	dev_gps_write( &dev_gps, 0, cmd_reset, 11 );
+
+	rt_thread_delay( RT_TICK_PER_SECOND * 2 );
+	//GPIO_ResetBits( GPIOD, GPIO_Pin_10 );
+	while( rt_thread_resume( &thread_gps ) != RT_EOK )
+	{
+		rt_thread_delay( RT_TICK_PER_SECOND / 20 );
+	}
+	rt_kprintf( "\nbd>resume gps ok" );
+
+	//rt_thread_delay( RT_TICK_PER_SECOND * 1 );
+	//GPIO_SetBits( GPIOD, GPIO_Pin_10 );
+	//msg( buf );
+}
+
+
+
+#if 0
+void thread_gps_check_ver( void* parameter )
+{
+	void		( *msg )( void *p );
+	int			count = 0;
 //	rt_uint8_t	*pdata; /*数据*/
 
 	char		buf[32];
@@ -558,13 +682,14 @@ void thread_gps_check_ver( void* parameter )
 
 	msg( "I正在查询..." );
 /*尝试停止gps线程*/
+
 	//GPIO_ResetBits( GPIOD, GPIO_Pin_10 );  /*先关模块*/
 	while( rt_thread_suspend( &thread_gps ) != RT_EOK )
 	{
 		rt_kprintf( "S" );
-		rt_thread_delay( 20 );
+		rt_thread_delay( 10 );
 		count++;
-		if( count > 100 )
+		if( count > 200 )
 		{
 			msg( "E查询版本失败" );
 			//GPIO_SetBits( GPIOD, GPIO_Pin_10 );  /*开模块*/
@@ -626,6 +751,8 @@ void thread_gps_check_ver( void* parameter )
 	}
 	rt_kprintf( "\nbd>resume gps ok" );
 }
+
+#endif
 
 /*更新北斗线程，使用U盘更新*/
 void thread_gps_upgrade_udisk( void* parameter )

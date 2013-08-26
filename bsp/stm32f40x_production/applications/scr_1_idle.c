@@ -152,14 +152,13 @@ static print_testresult( void )
 
 /*关掉所有外设*/
 
-	GPIO_ResetBits( GPIOD, GPIO_Pin_10 );  /*关掉gps*/
+	GPIO_ResetBits( GPIOD, GPIO_Pin_10 );   /*关掉gps*/
 
-	GPIO_ResetBits( GPIOD, GPIO_Pin_13 );			/*关掉gsm*/
+	GPIO_ResetBits( GPIOD, GPIO_Pin_13 );   /*关掉gsm*/
 	GPIO_ResetBits( GPIOD, GPIO_Pin_12 );
 
-	GPIO_ResetBits( GPIOB, GPIO_Pin_8 );		/*关掉CAM*/
+	GPIO_ResetBits( GPIOB, GPIO_Pin_8 );    /*关掉CAM*/
 
-	
 	printer( "      ******测试结果******      \r\n\n" );
 
 	sprintf( buf, "打印时间:20%02d/%02d/%02d %02d:%02d:%02d\r\n", gps_year, gps_month, gps_day, gps_hour, gps_minute, gps_sec );
@@ -252,7 +251,6 @@ static print_testresult( void )
 	}
 
 	printer( "\r\n\n\n\n\n\n\n\n\n" );
-	
 }
 
 /*显示状态信息*/
@@ -344,6 +342,10 @@ void showinfo( void )
 	{
 		lcd_asc0608( 40, 24, "MEMS", LCD_MODE_SET );
 	}
+	else
+	{
+		lcd_asc0608( 40, 24, "MEMS", LCD_MODE_INVERT );
+	}
 
 	if( test_flag & TEST_BIT_CAM )
 	{
@@ -365,29 +367,10 @@ void showinfo( void )
 
 static void show( void *parent )
 {
-	GPIO_InitTypeDef	GPIO_InitStructure;
-	uint8_t				i;
+
 
 	scr_1_idle.parent = (PSCR)parent;
 
-	for( i = 0; i < sizeof( PIN_OUT ) / sizeof( AUX_IO ); i++ )
-	{
-		GPIO_InitStructure.GPIO_Pin		= PIN_OUT[i].pin;
-		GPIO_InitStructure.GPIO_Mode	= GPIO_Mode_OUT;
-		GPIO_InitStructure.GPIO_OType	= GPIO_OType_PP;
-		GPIO_InitStructure.GPIO_Speed	= GPIO_Speed_100MHz;
-		GPIO_InitStructure.GPIO_PuPd	= GPIO_PuPd_NOPULL;
-		GPIO_Init( PIN_OUT[i].port, &GPIO_InitStructure );
-	}
-
-	GPIO_InitStructure.GPIO_Mode	= GPIO_Mode_IN;
-	GPIO_InitStructure.GPIO_PuPd	= GPIO_PuPd_NOPULL;
-
-	for( i = 0; i < sizeof( PIN_IN ) / sizeof( AUX_IO ); i++ )
-	{
-		GPIO_InitStructure.GPIO_Pin = PIN_IN[i].pin;
-		GPIO_Init( PIN_IN[i].port, &GPIO_InitStructure );
-	}
 /*PA0 速度信号*/
 
 	showinfo( );
@@ -409,6 +392,10 @@ static void keypress( unsigned int key )
 			pscr = &scr_3_bdupgrade;
 			pscr->show( &scr_1_idle );
 			break;
+		case KEY_OK_REPEAT:
+			pscr = &scr_4_bdcheck;
+			pscr->show( &scr_1_idle );
+			break;
 		case KEY_OK_PRESS:      /*返回上级菜单*/
 			break;
 		case KEY_UP_PRESS:      /*拍照*/
@@ -425,8 +412,8 @@ static void keypress( unsigned int key )
 /*定时检查状态变化*/
 static void timetick( unsigned int systick )
 {
-	static uint8_t	offset = 0;
-	uint32_t		sec;
+	static uint8_t	offset		= 0;
+	static uint32_t relay_sec	= 0;
 	uint8_t			buf[64];
 	uint8_t			i, j;
 	void			* pmsg;
@@ -483,21 +470,24 @@ static void timetick( unsigned int systick )
 					rt_mb_send( &mb_tts, (rt_uint32_t)pmsg );
 				}
 			}
-			print_testresult_count++;	// 500ms计数
+			print_testresult_count++; // 500ms计数
+
+
 			/*取消自动打印
-			if(print_testresult_count==10)
-			{
-				print_testresult();
-			}
-			*/
+			   if(print_testresult_count==10)
+			   {
+			   print_testresult();
+			   }
+			 */
 		}
 	}
 
 	offset++;
 	if( offset >= 20 )
 	{
+		relay_sec++;
 		offset = 0;
-		if( sec & 0x01 ) /*输出控制*/
+		if( relay_sec & 0x01 ) /*输出控制*/
 		{
 			GPIO_SetBits( GPIOB, GPIO_Pin_1 );
 		}else
@@ -544,5 +534,40 @@ SCR scr_1_idle =
 	&timetick,
 	&msg,
 };
+
+
+/***********************************************************
+* Function:
+* Description:
+* Input:
+* Input:
+* Output:
+* Return:
+* Others:
+***********************************************************/
+void aux_init( void )
+{
+	GPIO_InitTypeDef	GPIO_InitStructure;
+	uint8_t				i;
+
+	for( i = 0; i < sizeof( PIN_OUT ) / sizeof( AUX_IO ); i++ )
+	{
+		GPIO_InitStructure.GPIO_Pin		= PIN_OUT[i].pin;
+		GPIO_InitStructure.GPIO_Mode	= GPIO_Mode_OUT;
+		GPIO_InitStructure.GPIO_OType	= GPIO_OType_PP;
+		GPIO_InitStructure.GPIO_Speed	= GPIO_Speed_2MHz;
+		GPIO_InitStructure.GPIO_PuPd	= GPIO_PuPd_DOWN;
+		GPIO_Init( PIN_OUT[i].port, &GPIO_InitStructure );
+	}
+
+	GPIO_InitStructure.GPIO_Mode	= GPIO_Mode_IN;
+	GPIO_InitStructure.GPIO_PuPd	= GPIO_PuPd_NOPULL;
+
+	for( i = 0; i < sizeof( PIN_IN ) / sizeof( AUX_IO ); i++ )
+	{
+		GPIO_InitStructure.GPIO_Pin = PIN_IN[i].pin;
+		GPIO_Init( PIN_IN[i].port, &GPIO_InitStructure );
+	}
+}
 
 /************************************** The End Of File **************************************/

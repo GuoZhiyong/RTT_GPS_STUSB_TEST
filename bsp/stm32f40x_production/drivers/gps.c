@@ -12,7 +12,6 @@
  *     David    96/10/12     1.0     build this moudle
  ***********************************************************/
 
-
 #include <stdio.h>
 #include <rtthread.h>
 #include <rtdevice.h>
@@ -61,7 +60,6 @@ uint8_t							flag_bd_upgrade_uart = 0;
 extern struct rt_device			dev_vuart;
 
 static rt_uint8_t				*ptr_mem_packet = RT_NULL;
-
 
 //*****************************************
 //CRC16 高字节表
@@ -165,7 +163,6 @@ unsigned short  CalcCRC16( unsigned char*  src, int startpoint, int len )
 	res = ( crc_h << 8 ) | crc_l;
 	return res;
 }
-
 
 /*
    gps接收中断处理，收到\n认为收到一包
@@ -427,12 +424,12 @@ static void rt_thread_entry_gps( void* parameter )
 				}
 			}
 		}
-		rt_thread_delay( RT_TICK_PER_SECOND / 100 );
-		if( ( rt_tick_get( ) - tick_lastrx ) > RT_TICK_PER_SECOND * 10 )    /*长时间没有语句输出,模块损坏*/
+		rt_thread_delay( RT_TICK_PER_SECOND / 50 );
+		if( ( rt_tick_get( ) - tick_lastrx ) > RT_TICK_PER_SECOND * 30 )    /*长时间没有语句输出,模块损坏*/
 		{
 			rt_kprintf( "%d>gps no output\r\n", rt_tick_get( ) );
 			jt808_alarm |= BIT_ALARM_GPS_ERR;
-			test_flag|=TEST_BIT_GPS;
+			test_flag	|= TEST_BIT_GPS;
 			GPIO_ResetBits( GPIOD, GPIO_Pin_10 );                           /*off gps*/
 			while( rt_mq_recv( &mq_gps, (void*)&buf, NEMA_SIZE, RT_TICK_PER_SECOND / 20 ) == RT_EOK )
 			{
@@ -443,7 +440,7 @@ static void rt_thread_entry_gps( void* parameter )
 			tick_lastrx = rt_tick_get( );
 		}
 
-//		if( jt808_param.id_0xF013 == 0x3020 )
+		if( bd_model == 0x3020 )
 		{
 			count_check_antenna++;
 			if( count_check_antenna == 40 )
@@ -460,8 +457,8 @@ static void rt_thread_entry_gps( void* parameter )
 							rt_kprintf( "\n开路了" );
 						}
 						jt808_alarm |= BIT_ALARM_GPS_OPEN;
-						test_flag|=TEST_BIT_GPS;
-						rt_kprintf("\r\ntest_flag=%x",test_flag);
+						test_flag	|= TEST_BIT_GPS;
+						rt_kprintf( "\r\ntest_flag=%x", test_flag );
 					}else
 					{
 						jt808_alarm &= ~BIT_ALARM_GPS_OPEN;
@@ -470,8 +467,8 @@ static void rt_thread_entry_gps( void* parameter )
 					if( !GPIO_ReadInputDataBit( GPIOB, GPIO_Pin_6 ) ) //短路检测  0:天线短路
 					{
 						jt808_alarm |= BIT_ALARM_GPS_SHORT;
-						test_flag|=TEST_BIT_GPS;
-						rt_kprintf("\r\ntest_flag=%x",test_flag);
+						test_flag	|= TEST_BIT_GPS;
+						rt_kprintf( "\r\ntest_flag=%x", test_flag );
 					}else
 					{
 						jt808_alarm &= ~BIT_ALARM_GPS_SHORT;
@@ -553,7 +550,8 @@ void thread_gps_check_ver( void* parameter )
 	uint32_t	model;  /*型号*/
 	uint8_t		ok = 0; /*是否执行正确*/
 
-	uint8_t		cmd_reset[11] = { 0x40, 0x34, 0xC0, 0x00, 0x34, 0x00, 0x01, 0x84, 0x6B, 0x0D, 0x0A };
+	uint8_t		cmd_reset[11]	= { 0x40, 0x34, 0xC0, 0x00, 0x34, 0x00, 0x01, 0x84, 0x6B, 0x0D, 0x0A };
+	uint8_t		cmd_query[11]	= { 0x40, 0x10, 0xC0, 0x00, 0x10, 0x00, 0x01, 0xC2, 0x84, 0x0D, 0x0A };
 
 	msg = parameter;
 
@@ -579,7 +577,7 @@ void thread_gps_check_ver( void* parameter )
 /*先清除已有的数据，再发送*/
 	while( rt_mq_recv( &mq_gps, (void*)&uart_buf, NEMA_SIZE, 0 ) == RT_EOK )
 	{
-		rt_thread_delay( RT_TICK_PER_SECOND / 10 );
+		rt_thread_delay( RT_TICK_PER_SECOND / 50 );
 	}
 
 /*进入升级状态*/
@@ -588,13 +586,13 @@ void thread_gps_check_ver( void* parameter )
 	rt_thread_delay( RT_TICK_PER_SECOND );
 /*版本查询*/
 	count = 0;
-	while( rt_mq_recv( &mq_gps, (void*)&uart_buf, NEMA_SIZE, 0 ) == RT_EOK )
-	{
-		rt_thread_delay( RT_TICK_PER_SECOND / 10 );
-	}
 	for( count = 0; count < 5; count++ )
 	{
-		dev_gps_write( &dev_gps, 0, "\x40\x10\xC0\x00\x10\x00\x01\xC2\x84\x0D\x0A", 11 );
+		while( rt_mq_recv( &mq_gps, (void*)&uart_buf, NEMA_SIZE, 0 ) == RT_EOK )
+		{
+			rt_thread_delay( RT_TICK_PER_SECOND / 50 );
+		}
+		dev_gps_write( &dev_gps, 0,cmd_query, 11 );
 		res = rt_mq_recv( &mq_gps, (void*)&uart_buf, NEMA_SIZE, RT_TICK_PER_SECOND * 5 );
 		if( res == RT_EOK )                                             //收到一包数据
 		{
@@ -610,6 +608,7 @@ void thread_gps_check_ver( void* parameter )
 				rt_kprintf( "bd>%s", uart_buf.body );
 			}
 		}
+		rt_thread_delay(RT_TICK_PER_SECOND/10);
 	}
 
 	if( ok == 0 )
@@ -621,7 +620,7 @@ void thread_gps_check_ver( void* parameter )
 	{
 		dev_gps_write( &dev_gps, 0, "\x40\x16\xC0\x00\x16\x00\x01\x22\xE3\x0D\x0A", 11 );
 		res = rt_mq_recv( &mq_gps, (void*)&uart_buf, NEMA_SIZE, RT_TICK_PER_SECOND * 5 );
-		if( res == RT_EOK )                           //收到一包数据
+		if( res == RT_EOK )               //收到一包数据
 		{
 			if( ( uart_buf.wr == 28 ) && ( uart_buf.body[5] == 0x0 ) )
 			{
@@ -660,13 +659,22 @@ lbl_check_ver_err:
 	//msg( buf );
 }
 
-
-
 #if 0
+
+
+/***********************************************************
+* Function:
+* Description:
+* Input:
+* Input:
+* Output:
+* Return:
+* Others:
+***********************************************************/
 void thread_gps_check_ver( void* parameter )
 {
-	void		( *msg )( void *p );
-	int			count = 0;
+	void	( *msg )( void *p );
+	int		count = 0;
 //	rt_uint8_t	*pdata; /*数据*/
 
 	char		buf[32];
@@ -944,7 +952,7 @@ void thread_gps_upgrade_udisk( void* parameter )
 	buf[10] = file_matchcode[0];
 	buf[11] = file_matchcode[1];
 
-	crc		= CalcCRC16( buf, 1, 13);
+	crc		= CalcCRC16( buf, 1, 13 );
 	buf[14] = ( crc & 0xff00 ) >> 8;
 	buf[15] = crc & 0xff;
 
@@ -1013,7 +1021,7 @@ void thread_gps_upgrade_udisk( void* parameter )
 		packet_num++;
 		ptr_mem_packet[res + 6]		= ( res + 2 ) >> 8;
 		ptr_mem_packet[res + 7]		= ( res + 2 ) & 0xff;
-		crc							= CalcCRC16( ptr_mem_packet, 1, res + 7);
+		crc							= CalcCRC16( ptr_mem_packet, 1, res + 7 );
 		ptr_mem_packet[res + 8]		= ( crc & 0xff00 ) >> 8;
 		ptr_mem_packet[res + 9]		= crc & 0xff;
 		ptr_mem_packet[res + 10]	= 0x0d;
@@ -1070,7 +1078,6 @@ end_upgrade_usb_0:
 	rt_thread_delay( RT_TICK_PER_SECOND * 1 );
 	//GPIO_SetBits( GPIOD, GPIO_Pin_10 );
 }
-
 
 static char *reset_str[] = {
 	"$CCSIR,1,0*49\r\n",    /*热启动 BD*/

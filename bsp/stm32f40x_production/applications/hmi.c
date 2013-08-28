@@ -21,7 +21,7 @@
 #include "scr.h"
 #include "gsm.h"
 #include "sle4442.h"
-
+#include "common.h"
 
 /*
    #define KEY_MENU_PORT	GPIOC
@@ -148,9 +148,8 @@ static uint32_t  keycheck( void )
 	{
 		rt_kprintf( "\r\naux_in=%x", j );
 		aux_io_status = j;
-
 	}
-	
+
 	if( j )
 	{
 		aux_alarm_tick = 0xFFFFFFFF;
@@ -158,7 +157,6 @@ static uint32_t  keycheck( void )
 	{
 		aux_alarm_tick = 0;
 	}
-
 
 	if( aux_alarm_tick )
 	{
@@ -176,19 +174,27 @@ static uint32_t  keycheck( void )
 
 /*∫œ  Õ£÷πœÏ*/
 
-//if( tmp_key | j | mems_alarm_tick | iccard_beep_timeout )
 	if( tmp_key | aux_alarm_tick | mems_alarm_tick | iccard_beep_timeout )
 	{
-		ctrlbit_buzzer = 0x80;
-		lcd_update( 0, 31 );
-		//GPIO_SetBits(GPIOB,GPIO_Pin_6);
+		if( bd_model == 0x3020 )
+		{
+			ctrlbit_buzzer = 0x80;
+			lcd_update( 0, 31 );
+		}else
+		{
+			GPIO_SetBits( GPIOB, GPIO_Pin_6 );
+		}
 	}else
 	{
-		ctrlbit_buzzer = 0;
-		lcd_update( 0, 31 );
-		//GPIO_ResetBits(GPIOB,GPIO_Pin_6);
+		if( bd_model == 0x3020 )
+		{
+			ctrlbit_buzzer = 0;
+			lcd_update( 0, 31 );
+		}else
+		{
+			GPIO_ResetBits( GPIOB, GPIO_Pin_6 );
+		}
 	}
-
 	return ( tmp_key );
 }
 
@@ -230,8 +236,8 @@ static void key_lcd_port_init( void )
 	GPIO_Init( GPIOE, &GPIO_InitStructure );
 }
 
-
 extern void aux_init( void );
+
 
 ALIGN( RT_ALIGN_SIZE )
 static char thread_hmi_stack[2048];
@@ -246,7 +252,7 @@ static void rt_thread_entry_hmi( void* parameter )
 
 	key_lcd_port_init( );
 	lcd_init( );
-	aux_init();
+	aux_init( );
 	gsmstate( GSM_POWERON );
 
 	pscr = &scr_0_lcd_key;

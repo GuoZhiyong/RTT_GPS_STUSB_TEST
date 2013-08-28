@@ -19,13 +19,14 @@ uint8_t	test_cam_flag[4]={0x00,0x00,0x00,0x00};
 uint32_t test_flag = 0;
 
 
-
 /*AD检测*/
 
 #define ADC1_DR_Address ( (uint32_t)0X4001204C )
 
 uint16_t ADC_ConValue[3];   //   3  个通道ID    0 : 电池 1: 灰线   2:  绿线
 
+
+uint16_t bd_model=0x3020;		/*北斗型号 0x3020 缺省 */
 
 
 

@@ -21,6 +21,7 @@
 #include <finsh.h>
 
 #include "sed1520.h"
+#include "common.h"
 
 /*打印头相关*/
 
@@ -184,7 +185,7 @@ __IO uint8_t fprinting = 0;     //是否正在打印
 * Return:         // 函数返回值的说明
 * Others:         // 其它说明
 ***********************************************************/
-static void printer_port_init( void )
+void printer_port_init( void )
 {
 	GPIO_InitTypeDef gpio_init;
 
@@ -238,10 +239,19 @@ static void printer_port_init( void )
 	GPIO_Init( PRINTER_POWER_PORT_5V, &gpio_init );
 	GPIO_ResetBits( PRINTER_POWER_PORT_5V, PRINTER_POWER_PIN_5V );
 
-	//gpio_init.GPIO_Pin = PRINTER_POWER_PIN_3V3;
-	//GPIO_Init( PRINTER_POWER_PORT_3V3, &gpio_init );
-	//GPIO_SetBits( PRINTER_POWER_PORT_3V3, PRINTER_POWER_PIN_3V3 );
-	ctrlbit_printer_3v3_on = 0x20;
+	if( bd_model == 0x3020 )
+	{
+		ctrlbit_printer_3v3_on = 0x20;
+	}else
+	{
+		gpio_init.GPIO_Pin = PRINTER_POWER_PIN_3V3;
+		GPIO_Init( PRINTER_POWER_PORT_3V3, &gpio_init );
+		GPIO_SetBits( PRINTER_POWER_PORT_3V3, PRINTER_POWER_PIN_3V3 );
+		
+		gpio_init.GPIO_Pin = GPIO_Pin_6;	/*蜂鸣器*/
+		GPIO_Init( GPIOB, &gpio_init );
+		
+	}
 
 	gpio_init.GPIO_Pin	= PHE_PIN;
 	gpio_init.GPIO_Mode = GPIO_Mode_IN;
@@ -973,8 +983,13 @@ static rt_err_t printer_control( rt_device_t dev, rt_uint8_t cmd, void *arg )
 ***********************************************************/
 static rt_err_t printer_close( rt_device_t dev )
 {
-	//GPIO_ResetBits( PRINTER_POWER_PORT_3V3, PRINTER_POWER_PIN_3V3 );
-	ctrlbit_printer_3v3_on = 0;
+	if( bd_model == 0x3020 )
+	{
+		ctrlbit_printer_3v3_on = 0;
+	}else
+	{
+		GPIO_ResetBits( PRINTER_POWER_PORT_3V3, PRINTER_POWER_PIN_3V3 );
+	}
 	GPIO_ResetBits( PRINTER_POWER_PORT_5V, PRINTER_POWER_PIN_5V );
 	return RT_EOK;
 }

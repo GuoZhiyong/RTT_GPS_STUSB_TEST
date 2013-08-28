@@ -86,6 +86,8 @@ extern uint32_t Frequency;
 
 extern uint32_t 	print_testresult_count;
 
+extern uint16_t bd_model;
+
 
 void ad_init( void );
 

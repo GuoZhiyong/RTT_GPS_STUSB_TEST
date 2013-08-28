@@ -16,6 +16,8 @@
 #include "sed1520.h"
 #include "stm32f4xx.h"
 
+#include "common.h"
+
 /* pixel level bit masks for display */
 /* this array is setup to map the order */
 /* of bits in a byte to the vertical order */
@@ -145,8 +147,6 @@ const unsigned char asc_0608[][6] =
 	{ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }, /*"",95*/
 };
 
-
-
 extern uint8_t	ctrlbit_printer_3v3_on;
 extern uint8_t	ctrlbit_buzzer;
 
@@ -168,20 +168,22 @@ void ControlBitShift( unsigned char data )
 	//IOCLR0 = STCP2;
 	GPIO_SetBits( GPIOE, GPIO_Pin_15 );
 	GPIO_ResetBits( GPIOE, GPIO_Pin_13 );
-
-	if( ctrlbit_buzzer )
+	if( bd_model == 0x3020 )
 	{
-		data |= 0x80;
-	} else
-	{
-		data &= 0x7f;
-	}
-	if( ctrlbit_printer_3v3_on )
-	{
-		data |= 0x20;
-	} else
-	{
-		data &= ~0x20;
+		if( ctrlbit_buzzer )
+		{
+			data |= 0x80;
+		} else
+		{
+			data &= 0x7f;
+		}
+		if( ctrlbit_printer_3v3_on )
+		{
+			data |= 0x20;
+		} else
+		{
+			data &= ~0x20;
+		}
 	}
 
 	for( i = 0; i < 8; i++ )
@@ -232,7 +234,7 @@ void DataBitShift( unsigned char data )
 		{
 			//IOCLR0 = DS;
 			//GPIO_ResetBits( GPIOE, GPIO_Pin_14 );
-			GPIOE->BSRRH=GPIO_Pin_14;
+			GPIOE->BSRRH = GPIO_Pin_14;
 		}
 		//IOSET0 = SHCP;
 		GPIO_SetBits( GPIOE, GPIO_Pin_12 );
@@ -336,7 +338,6 @@ void lcd_init( void )
 	lcd_out_ctl( LCD_SET_PAGE + 0, 3 );
 	lcd_out_ctl( LCD_SET_COL, 3 );
 }
-
 
 /**/
 void lcd_update( const unsigned char top, const unsigned char bottom )

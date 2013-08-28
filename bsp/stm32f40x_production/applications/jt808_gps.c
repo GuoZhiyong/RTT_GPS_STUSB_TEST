@@ -340,6 +340,8 @@ uint8_t process_gga( uint8_t * pinfo )
 	return 9;
 }
 
+
+extern void printer_port_init( void );
 /***********************************************************
 * Function:
 * Description:gps收到信息后的处理，头两个字节为长度
@@ -375,7 +377,33 @@ void gps_rx( uint8_t * pinfo, uint16_t length )
 	if( strncmp( psrc + 3, "RMC,", 4 ) == 0 )
 	{
 		gps_sec_count++;
+		
 		ret = process_rmc( (uint8_t*)psrc );
+	}
+
+	if( strncmp( psrc + 3, "TXT,", 4 ) == 0 )
+	{
+		if(bd_model!=0x3017)		/*型号切换 打印的3.3V 蜂鸣器*/
+		{
+
+			bd_model=0x3017;			printer_port_init();
+			rt_kprintf("\n发现3017 bd_model=%x",bd_model);
+			GPIO_SetBits(GPIOB,GPIO_Pin_6);
+		}
+		if( strncmp( psrc + 24, "OK", 2 ) == 0 )
+		{
+			gps_status.Antenna_Flag = 0;
+			jt808_alarm				&= ~( BIT_ALARM_GPS_OPEN | BIT_ALARM_GPS_SHORT );
+		}else if( strncmp( psrc + 24, "OPEN", 4 ) == 0 )
+		{
+			gps_status.Antenna_Flag = 1;
+			jt808_alarm				|= BIT_ALARM_GPS_OPEN; /*bit5 天线开路*/
+		}else if( strncmp( psrc + 24, "SHORT", 4 ) == 0 )
+		{
+			gps_status.Antenna_Flag = 1;
+			jt808_alarm				|= BIT_ALARM_GPS_SHORT;
+		}
+
 	}
 }
 

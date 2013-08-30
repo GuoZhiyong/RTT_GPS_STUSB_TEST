@@ -24,9 +24,11 @@
 定义使用的模块型号
 */
 //#define MG323
-#define M66
+//#define M66
 //#define MC323
 //#define EM310
+
+#define MC8332
 
 
 

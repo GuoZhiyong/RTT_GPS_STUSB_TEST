@@ -152,6 +152,7 @@ static uint32_t  keycheck( void )
 
 	if( j )
 	{
+		rt_kprintf( "\r\naux_in=%x", j );
 		aux_alarm_tick = 0xFFFFFFFF;
 	}else
 	{
@@ -246,6 +247,7 @@ struct rt_thread thread_hmi;
 static void rt_thread_entry_hmi( void* parameter )
 {
 	uint8_t				i;
+
 
 	RCC_ClocksTypeDef	RCC_Clocks;
 	RCC_GetClocksFreq( &RCC_Clocks );

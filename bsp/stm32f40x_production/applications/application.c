@@ -32,17 +32,21 @@
  */
 void rt_init_thread_entry( void* parameter )
 {
-	uint16_t	sector = 0;
-	uint32_t	addr;
-	uint16_t	i;
+	uint16_t	sector	= 0;
+	__IO uint32_t	addr	= 0;
+	uint16_t	i, j;
 	uint8_t		buf[256];
-	uint8_t		test_df=1;
+	uint8_t		test_df = 1;
+
+
 
 	mma8451_driver_init( );
 	printer_driver_init( );
 	usbh_init( );
 	spi_sd_init( );
 
+
+	
 	while( 1 )
 	{
 		if( rtc_ok == 0 )
@@ -50,16 +54,15 @@ void rt_init_thread_entry( void* parameter )
 			rtc_retry++;
 			if( rtc_init( ) == 0 )
 			{
-				rtc_ok = 1;
-				test_flag|=TEST_BIT_RTC;
-				rt_kprintf("\r\ntest_flag=%x",test_flag);
+				rtc_ok		= 1;
+				test_flag	|= TEST_BIT_RTC;
+				rt_kprintf( "\r\ntest_flag=%x", test_flag );
 			}
 		}
-		if(test_df==1)
+		if( test_df == 1 )
 		{
-		
 			addr = sector * 4096;
-			rt_kprintf("\r\n%d>test df sector:%d",rt_tick_get(),sector);
+			rt_kprintf( "\r\n%d>test df sector:%d", rt_tick_get( ), sector );
 			sst25_erase_4k( addr );
 			for( i = 0; i < 256; i++ )
 			{
@@ -76,20 +79,20 @@ void rt_init_thread_entry( void* parameter )
 			{
 				if( buf[i] != i )
 				{
-					test_df_error_sector[test_df_error]=sector;
+					test_df_error_sector[test_df_error] = sector;
 					test_df_error++;
-					rt_kprintf("\r\n%d>DF error index=%d sector=%d",rt_tick_get(),i,sector);
+					rt_kprintf( "\r\n%d>DF error index=%d sector=%d", rt_tick_get( ), i, sector );
 					break;
 				}
 			}
 			sst25_erase_4k( addr );
 			test_df_count++;
-			sector+=100;
-			if( sector >1023)
+			sector += 100;
+			if( sector > 1023 )
 			{
-				test_df=0;
-				test_flag|=TEST_BIT_DF;
-				rt_kprintf("\r\ntest_flag=%x",test_flag);
+				test_df		= 0;
+				test_flag	|= TEST_BIT_DF;
+				rt_kprintf( "\r\ntest_flag=%x", test_flag );
 			}
 		}
 		rt_thread_delay( RT_TICK_PER_SECOND * 2 );

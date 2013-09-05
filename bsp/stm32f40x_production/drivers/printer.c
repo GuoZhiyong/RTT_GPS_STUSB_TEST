@@ -192,7 +192,9 @@ void printer_port_init( void )
 	RCC_AHB1PeriphClockCmd( RCC_AHB1Periph_GPIOB | RCC_AHB1Periph_GPIOC | RCC_AHB1Periph_GPIOD | RCC_AHB1Periph_GPIOE, ENABLE );
 	/*È¥µôPB4 JTAG¹¦ÄÜ*/
 	//GPIOB->AFR[0]|=(1<<16);
-	GPIO_PinAFConfig( GPIOB, GPIO_Pin_4, 1 );
+	GPIO_PinAFConfig( GPIOB, GPIO_Pin_4, GPIO_AF_EVENTOUT);
+	
+	
 
 	gpio_init.GPIO_Mode		= GPIO_Mode_OUT;
 	gpio_init.GPIO_OType	= GPIO_OType_PP;

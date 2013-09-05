@@ -230,6 +230,7 @@ static rt_err_t dev_gsm_init( rt_device_t dev )
 	GPIO_InitStructure.GPIO_Pin = GSM_RST_PIN;
 	GPIO_Init( GSM_RST_PORT, &GPIO_InitStructure );
 	GPIO_SetBits( GSM_RST_PORT, GSM_RST_PIN );
+	//GPIO_ResetBits( GSM_RST_PORT, GSM_RST_PIN );
 
 	GPIO_InitStructure.GPIO_OType	= GPIO_OType_PP;
 	GPIO_InitStructure.GPIO_Pin		= GPIO_Pin_9;
@@ -256,7 +257,7 @@ static rt_err_t dev_gsm_init( rt_device_t dev )
 	NVIC_InitStructure.NVIC_IRQChannelCmd					= ENABLE;
 	NVIC_Init( &NVIC_InitStructure );
 
-	USART_InitStructure.USART_BaudRate				= 57600;
+	USART_InitStructure.USART_BaudRate				= 115200;
 	USART_InitStructure.USART_WordLength			= USART_WordLength_8b;
 	USART_InitStructure.USART_StopBits				= USART_StopBits_1;
 	USART_InitStructure.USART_Parity				= USART_Parity_No;
@@ -462,7 +463,7 @@ static void gsmrx_cb( uint8_t *pInfo, uint16_t len )
 		pscr->msg( (void*)&lcd_msg );
 	}
 
-	if( strncmp( psrc, "%TTS: 0", 7 ) == 0 )
+	if( strncmp( psrc, "+ZTTS:0", 7 ) == 0 )
 	{
 		tts_playing = 0;
 	}
@@ -478,6 +479,22 @@ static void gsmrx_cb( uint8_t *pInfo, uint16_t len )
 	return;
 }
 
+
+rt_err_t pt_resp_ZTCPESTABLISHED( char *p, uint16_t len )
+{
+	char *pfind = RT_NULL;
+	pfind = strstr( p, "ZTCPESTABLISHED" );
+	if( pfind )
+	{
+		gprs_ok_past_sec	= rt_tick_get( ) / 100;
+		test_flag			|= TEST_BIT_GPRS;
+		rt_kprintf("\r\ntest_flag=%x",test_flag);
+		return RT_EOK; /*找到了*/
+	}
+	return RT_ERROR;
+}
+
+
 /**/
 rt_err_t pt_resp_ZPPPSTATUS( char *p, uint16_t len )
 {
@@ -490,7 +507,9 @@ rt_err_t pt_resp_ZPPPSTATUS( char *p, uint16_t len )
 	return RT_ERROR;
 }
 
-/**/
+/*
+   +ZIND:8
+ */
 rt_err_t pt_resp_ZIND( char *p, uint16_t len )
 {
 	char *pfind = RT_NULL;
@@ -627,9 +646,14 @@ rt_err_t pt_resp_CSQ( char *p, uint16_t len )
 	{
 		return RT_ERROR;
 	}
-	if( n != 0 )
+	if( n == 99 )
 	{
-		gsm_csq = n;
+		return RT_ERROR;
+	}
+	gsm_csq = n;
+	if( n < 16 )
+	{
+		return RT_ERROR;
 	}
 	return RT_EOK;
 }
@@ -702,37 +726,15 @@ rt_err_t pt_resp_IPOPENX( char *p, uint16_t len )
 }
 
 /*
-   Platform Version:  MOCOR_09A_MP.W11.48_P1.08_Release
-   Project Version: SC6600L_6610_modem
-   MMI Version: V049P
-   Base Version: BASE_10A.W11.48
-   HW Version: SC6610_M10
-   Build Time: 2-18-2013 17:15:32
-   OK
+ +CGMR: S/W VER: MC8332_MM8A8016  ZTEMT Team
+ OK
  */
-rt_err_t pt_resp_CGMR_M66( char *p, uint16_t len )
-{
-	extern char gsm_ver[8];
-	char		*pdst = RT_NULL;
-
-	pdst = strstr( p, "V0" );
-	if( pdst != RT_NULL )
-	{
-		strncpy( gsm_ver, pdst + 2, 3 );
-		return RT_EOK;
-	}
-	return RT_ERROR;
-}
-/*
-+CGMR: S/W VER: MG815  BM8A413E ZTEiT Team  
-OK
-*/
 rt_err_t pt_resp_CGMR( char *p, uint16_t len )
 {
 	extern char gsm_ver[8];
 	char		*pdst = RT_NULL;
 
-	pdst = strstr( p, "BM" );
+	pdst = strstr( p, "MM8" );
 	if( pdst != RT_NULL )
 	{
 		strncpy( gsm_ver, pdst + 5, 3 );
@@ -740,9 +742,6 @@ rt_err_t pt_resp_CGMR( char *p, uint16_t len )
 	}
 	return RT_ERROR;
 }
-
-
-
 
 /*通用检查函数，看是否收到数据，如果有数据后再判断*/
 rt_err_t pt_resp( RESP_FUNC func )
@@ -774,99 +773,6 @@ typedef struct
 
 /*gsm供电的处理纤程*/
 
-/**/
-#ifdef M66
-
-static int protothread_gsm_power( struct pt *pt )
-{
-	static AT_CMD_RESP at_init[] =
-	{
-		{ RT_NULL,											pt_resp_STR_OK,	 RT_TICK_PER_SECOND * 10, 1	 },
-		{ RT_NULL,											pt_resp_STR_OK,	 RT_TICK_PER_SECOND * 10, 1	 },
-		{ "ATE0\r\n",										pt_resp_STR_OK,	 RT_TICK_PER_SECOND * 5,  1	 },
-		{ "ATV1\r\n",										pt_resp_STR_OK,	 RT_TICK_PER_SECOND * 5,  1	 },
-		{ "AT%TTS=2,3,5,\"BFAACABCB2E2CAD4\"\r\n",			pt_resp_STR_OK,	 RT_TICK_PER_SECOND * 20, 1	 },
-		{ "AT+CPIN?\r\n",									pt_resp_CPIN,	 RT_TICK_PER_SECOND * 3,  10 },
-		{ "AT+CREG?\r\n",									pt_resp_CGREG,	 RT_TICK_PER_SECOND * 3,  10 },
-		{ "AT+CIMI\r\n",									pt_resp_CIMI,	 RT_TICK_PER_SECOND * 3,  1	 },
-		{ "AT+CGMR\r\n",									pt_resp_CGMR,	 RT_TICK_PER_SECOND * 3,  10 },
-		{ "AT+CGREG?\r\n",									pt_resp_CGREG,	 RT_TICK_PER_SECOND * 3,  10 },
-		{ "AT+CGATT?\r\n",									pt_resp_CGATT,	 RT_TICK_PER_SECOND * 3,  10 },
-		{ "AT+CGDCONT=1,\"IP\",\"CMNET\"\r\n",				pt_resp_STR_OK,	 RT_TICK_PER_SECOND * 10, 1	 },
-		{ "AT%ETCPIP=1,\"\",\"\"\r\n",						pt_resp_STR_OK,	 RT_TICK_PER_SECOND * 30, 1	 },
-		{ "AT%ETCPIP?\r\n",									pt_resp_ETCPIP,	 RT_TICK_PER_SECOND * 3,  1	 },
-		{ "AT%IOMODE=1,2,1\r\n",							pt_resp_STR_OK,	 RT_TICK_PER_SECOND * 3,  1	 },
-		{ "AT%IPOPENX=1,\"TCP\",\"60.28.50.210\",9131\r\n", pt_resp_IPOPENX, RT_TICK_PER_SECOND * 3,  1	 },
-	};
-
-	static struct pt_timer	timer_gsm_power;
-	static uint8_t			at_init_index	= 0;
-	static uint8_t			at_init_retry	= 0;
-	rt_err_t				ret;
-
-	PT_BEGIN( pt );
-	if( gsm_state == GSM_POWERON )
-	{
-		GPIO_ResetBits( GSM_PWR_PORT, GSM_PWR_PIN );
-		GPIO_ResetBits( GSM_TERMON_PORT, GSM_TERMON_PIN );
-		pt_timer_set( &timer_gsm_power, 200 );
-		PT_WAIT_UNTIL( pt, pt_timer_expired( &timer_gsm_power ) );
-		GPIO_SetBits( GSM_TERMON_PORT, GSM_TERMON_PIN );
-		GPIO_SetBits( GSM_PWR_PORT, GSM_PWR_PIN );
-
-		//GPIO_ResetBits(GPIOD,GPIO_Pin_9); /*开功放*/
-
-		for( at_init_index = 0; at_init_index < sizeof( at_init ) / sizeof( AT_CMD_RESP ); at_init_index++ )
-		{
-			for( at_init_retry = 0; at_init_retry < at_init[at_init_index].retry; at_init_retry++ )
-			{
-				if( at_init[at_init_index].atcmd != RT_NULL )
-				{
-					dev_gsm_write( &dev_gsm, 0, at_init[at_init_index].atcmd, strlen( at_init[at_init_index].atcmd ) );
-					rt_kprintf( "%08d gsm_send>%s", rt_tick_get( ), at_init[at_init_index].atcmd );
-				}
-				pt_timer_set( &timer_gsm_power, at_init[at_init_index].timeout );
-				PT_WAIT_UNTIL( pt, pt_timer_expired( &timer_gsm_power ) || ( RT_EOK == pt_resp( at_init[at_init_index].resp ) ) );
-				if( pt_timer_expired( &timer_gsm_power ) ) /*超时*/
-				{
-					rt_kprintf( "timeout\r\n" );
-				}else
-				{
-					break;
-				}
-			}
-			if( pt_timer_expired( &timer_gsm_power ) )  /*因为超时退出的*/
-			{
-				PT_EXIT( pt );
-			}
-		}
-		//GPIO_SetBits(GPIOD,GPIO_Pin_9); /*关功放*/
-		gsm_state = GSM_AT;                             /*切换到AT状态*/
-	}
-	if( gsm_state == GSM_AT )                           /*定时查CSQ*/
-	{
-		dev_gsm_write( &dev_gsm, 0, "AT+CSQ\r\n", 8 );
-		rt_kprintf( "%08d gsm_send>%s", rt_tick_get( ), "AT+CSQ\r\n" );
-		pt_timer_set( &timer_gsm_power, RT_TICK_PER_SECOND * 3 );
-		PT_WAIT_UNTIL( pt, pt_timer_expired( &timer_gsm_power ) || ( RT_EOK == pt_resp( pt_resp_CSQ ) ) );
-		if( pt_timer_expired( &timer_gsm_power ) )      /*超时*/
-		{
-			rt_kprintf( "\r\nAT+CSQ timeout\r\n" );
-		}
-		pt_timer_set( &timer_gsm_power, RT_TICK_PER_SECOND * 3 );
-		PT_WAIT_UNTIL( pt, pt_timer_expired( &timer_gsm_power ) );
-	}
-	if( gsm_state == GSM_POWEROFF )
-	{
-		GPIO_ResetBits( GSM_PWR_PORT, GSM_PWR_PIN );
-		GPIO_ResetBits( GSM_TERMON_PORT, GSM_TERMON_PIN );
-		gsm_state = GSM_IDLE;
-	}
-	PT_END( pt );
-}
-
-#endif
-
 #ifdef MC8332
 
 
@@ -883,23 +789,26 @@ static int protothread_gsm_power( struct pt *pt )
 {
 	static AT_CMD_RESP at_init[] =
 	{
-		{ RT_NULL,								 pt_resp_ZIND,		 RT_TICK_PER_SECOND * 10, 1	 },
-		{ "ATE0\r\n",							 pt_resp_STR_OK,	 RT_TICK_PER_SECOND * 5,  1	 },
-		{ "ATV1\r\n",							 pt_resp_STR_OK,	 RT_TICK_PER_SECOND * 5,  1	 },
-		{ "AT+CPIN?\r\n",						 pt_resp_CPIN,		 RT_TICK_PER_SECOND * 3,  10 },
-		{ "AT+CREG?\r\n",						 pt_resp_CGREG,		 RT_TICK_PER_SECOND * 3,  10 },
-		{ "AT+SPEAKER=1\r\n",					 pt_resp_STR_OK,	 RT_TICK_PER_SECOND * 5,  1	 },
-		{ "AT+VGR=3\r\n",						 pt_resp_STR_OK,	 RT_TICK_PER_SECOND * 5,  1	 },
-		{ "AT%ZTTS=2,\"BFAACABCB2E2CAD4\"\r\n",	 pt_resp_STR_OK,	 RT_TICK_PER_SECOND * 20, 1	 },
+		{ RT_NULL,									  pt_resp_ZIND,		  RT_TICK_PER_SECOND * 10, 1  },
+		{ "AT\r",									  pt_resp_STR_OK,	  RT_TICK_PER_SECOND * 10, 1  },
+		{ "ATE0\r",									  pt_resp_STR_OK,	  RT_TICK_PER_SECOND * 5,  1  },
+		{ "ATV1\r",									  pt_resp_STR_OK,	  RT_TICK_PER_SECOND * 5,  1  },
+		{ "AT+CSQ?\r",								  pt_resp_CSQ,		  RT_TICK_PER_SECOND * 5,  10 },
 
-		{ "AT+CIMI\r\n",						 pt_resp_CIMI,		 RT_TICK_PER_SECOND * 3,  1	 },
-		{ "AT+CGMR\r\n",						 pt_resp_CGMR,		 RT_TICK_PER_SECOND * 3,  10 },
+		{ "AT+CPIN?\r",								  pt_resp_CPIN,		  RT_TICK_PER_SECOND * 3,  10 },
+		{ "AT+CREG?\r",								  pt_resp_CGREG,	  RT_TICK_PER_SECOND * 3,  20 },
+		{ "AT+SPEAKER=1\r",							  pt_resp_STR_OK,	  RT_TICK_PER_SECOND * 5,  1  },
+		{ "AT+VGR=0\r",								  pt_resp_STR_OK,	  RT_TICK_PER_SECOND * 5,  1  },
+		{ "AT+ZTTS=2,\"C4FECFC4BFAACABCB2E2CAD4\"\r", pt_resp_STR_OK,	  RT_TICK_PER_SECOND * 20, 1  },
 
-		{ "AT%ZPNUM=#777\r\n",					 pt_resp_STR_OK,	 RT_TICK_PER_SECOND * 20, 1	 },
-		{ "AT%ZPIDPWD=card,card\r\n",			 pt_resp_STR_OK,	 RT_TICK_PER_SECOND * 20, 1	 },
-		{ "AT%ZPPPOPEN\r\n",					 pt_resp_STR_OK,	 RT_TICK_PER_SECOND * 20, 1	 },
-		{ RT_NULL,								 pt_resp_ZPPPSTATUS, RT_TICK_PER_SECOND * 40, 1	 },
-		{ "AT+ZIPSETUP=0,60.28.50.210,9131\r\n", pt_resp_STR_OK,	 RT_TICK_PER_SECOND * 10, 1	 },
+		{ "AT+CIMI\r",								  pt_resp_CIMI,		  RT_TICK_PER_SECOND * 3,  1  },
+		{ "AT+CGMR\r",								  pt_resp_CGMR,		  RT_TICK_PER_SECOND * 3,  3  },
+
+		{ "AT+ZPNUM=#777\r",						  pt_resp_STR_OK,	  RT_TICK_PER_SECOND * 20, 1  },
+		{ "AT+ZPIDPWD=card,card\r",					  pt_resp_STR_OK,	  RT_TICK_PER_SECOND * 20, 1  },
+		{ "AT+ZPPPOPEN\r",							  pt_resp_STR_OK,	  RT_TICK_PER_SECOND * 20, 1  },
+		{ RT_NULL,									  pt_resp_ZPPPSTATUS, RT_TICK_PER_SECOND * 40, 1  },
+		{ "AT+ZIPSETUP=0,60.28.50.210,9131\r",		  pt_resp_ZTCPESTABLISHED,	  RT_TICK_PER_SECOND * 30, 1  },
 	};
 
 	static struct pt_timer	timer_gsm_power;
@@ -912,10 +821,17 @@ static int protothread_gsm_power( struct pt *pt )
 	{
 		GPIO_ResetBits( GSM_PWR_PORT, GSM_PWR_PIN );
 		GPIO_ResetBits( GSM_TERMON_PORT, GSM_TERMON_PIN );
+
 		pt_timer_set( &timer_gsm_power, 200 );
 		PT_WAIT_UNTIL( pt, pt_timer_expired( &timer_gsm_power ) );
+
 		GPIO_SetBits( GSM_TERMON_PORT, GSM_TERMON_PIN );
 		GPIO_SetBits( GSM_PWR_PORT, GSM_PWR_PIN );
+
+		pt_timer_set( &timer_gsm_power, 200 );
+		PT_WAIT_UNTIL( pt, pt_timer_expired( &timer_gsm_power ) );
+
+		//GPIO_ResetBits( GSM_TERMON_PORT, GSM_TERMON_PIN );
 
 		//GPIO_ResetBits(GPIOD,GPIO_Pin_9); /*开功放*/
 
@@ -923,10 +839,13 @@ static int protothread_gsm_power( struct pt *pt )
 		{
 			for( at_init_retry = 0; at_init_retry < at_init[at_init_index].retry; at_init_retry++ )
 			{
+				pt_timer_set( &timer_gsm_power, 50 );
+				PT_WAIT_UNTIL( pt, pt_timer_expired( &timer_gsm_power ) );
+
 				if( at_init[at_init_index].atcmd != RT_NULL )
 				{
 					dev_gsm_write( &dev_gsm, 0, at_init[at_init_index].atcmd, strlen( at_init[at_init_index].atcmd ) );
-					rt_kprintf( "%08d gsm_send>%s", rt_tick_get( ), at_init[at_init_index].atcmd );
+					rt_kprintf( "%d gsm_send>%s", rt_tick_get( ), at_init[at_init_index].atcmd );
 				}
 				pt_timer_set( &timer_gsm_power, at_init[at_init_index].timeout );
 				PT_WAIT_UNTIL( pt, pt_timer_expired( &timer_gsm_power ) || ( RT_EOK == pt_resp( at_init[at_init_index].resp ) ) );

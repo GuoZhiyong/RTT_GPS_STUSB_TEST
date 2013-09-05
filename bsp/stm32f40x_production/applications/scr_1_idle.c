@@ -22,10 +22,10 @@
 
 #include "common.h"
 
-AUX_IO				PIN_IN[10] = {
+AUX_IO				PIN_IN[] = {
 	{ GPIOE, GPIO_Pin_8,  78,  19 },    /*紧急按钮*/
 	{ GPIOE, GPIO_Pin_9,  64,  26 },    /*ACC*/
-	{ GPIOE, GPIO_Pin_7,  71,  19 },    /*输入*/
+	//{ GPIOE, GPIO_Pin_7,  71,  19 },    /*输入*/
 	{ GPIOC, GPIO_Pin_0,  95,  26 },    /*4.远光*/
 	{ GPIOC, GPIO_Pin_1,  88,  26 },    /*5.车门*/
 	{ GPIOA, GPIO_Pin_1,  116, 19 },    /*6.喇叭 定义为AD输入*/
@@ -144,6 +144,8 @@ uint8_t gsm_csq_max = 0;
 /*记录上一次的状态*/
 uint8_t ctrlbit_status = 0;
 
+uint8_t hw_ver[4] = { '0', '0', '0', 0 };
+
 static print_testresult( void )
 {
 	char	*gps_mode[4] = { "  ", "BD", "GP", "GN" };
@@ -166,6 +168,10 @@ static print_testresult( void )
 
 	sprintf( buf, "测试用时:%02d:%02d\r\n", rt_tick_get( ) / 100 / 60, rt_tick_get( ) / 100 % 60 );
 	printer( buf );
+
+	sprintf( buf, "硬件版本代码:%s\r\n", hw_ver );
+	printer( buf );
+
 
 	printer( "\r\n\nBDGPS- " );
 
@@ -191,7 +197,7 @@ static print_testresult( void )
 	sprintf( buf, "    定位模式:%s 星数:%d\r\n", gps_mode[gps_status.mode], gps_status.NoSV );
 	printer( buf );
 
-	sprintf( buf, "\r\n\nGSM-M66 VER:%s\r\n", gsm_ver );
+	sprintf( buf, "\r\n\nCDMA-MC8332 VER:%s\r\n", gsm_ver );
 	printer( buf );
 	sprintf( buf, "    登网用时:%02d:%02d\r\n", gprs_ok_past_sec / 60, gprs_ok_past_sec % 60 );
 	printer( buf );
@@ -270,7 +276,7 @@ void showinfo( void )
 	sprintf( buf, "%02d:%02d  %04d", gps_sec_count / 60, gps_sec_count % 60, Frequency );
 	lcd_asc0608( 0, 0, buf, LCD_MODE_SET );
 
-	lcd_asc0608( 122 - 6 * 6, 0, "082901", LCD_MODE_SET );
+	lcd_asc0608( 122 - 6 * 6, 0, "090501", LCD_MODE_SET );
 
 	if( gps_fixed_sec )
 	{
@@ -312,16 +318,6 @@ void showinfo( void )
 	}
 	lcd_asc0608( 44, 16, gsm_ver, LCD_MODE_SET );
 
-	if( iccard_value == 1 )
-	{
-		lcd_asc0608( 98, 24, "IC", LCD_MODE_SET );
-	}else if( iccard_value == 2 )
-	{
-		lcd_asc0608( 98, 24, "IC", LCD_MODE_INVERT );
-	}else
-	{
-	}
-
 	if( rtc_ok )
 	{
 		lcd_asc0608( 0, 24, "RTC", LCD_MODE_SET );
@@ -331,32 +327,46 @@ void showinfo( void )
 	{
 		if( test_df_error )
 		{
-			lcd_asc0608( 24, 24, "DF", LCD_MODE_INVERT );
+			lcd_asc0608( 22, 24, "DF", LCD_MODE_INVERT );
 		} else
 		{
-			lcd_asc0608( 24, 24, "DF", LCD_MODE_SET );
+			lcd_asc0608( 22, 24, "DF", LCD_MODE_SET );
 		}
 	}
 
 	if( mems_status == SUCCESS )
 	{
-		lcd_asc0608( 40, 24, "MEMS", LCD_MODE_SET );
-	}
-	else
+		lcd_asc0608( 38, 24, "MEMS", LCD_MODE_SET );
+	}else
 	{
-		lcd_asc0608( 40, 24, "MEMS", LCD_MODE_INVERT );
+		lcd_asc0608( 38, 24, "MEMS", LCD_MODE_INVERT );
 	}
 
 	if( test_flag & TEST_BIT_CAM )
 	{
 		if( test_cam_flag[0] == 1 )
 		{
-			lcd_asc0608( 70, 24, "CAM", LCD_MODE_SET );
+			lcd_asc0608( 66, 24, "CAM", LCD_MODE_SET );
 		}else
 		{
-			lcd_asc0608( 70, 24, "CAM", LCD_MODE_INVERT );
+			lcd_asc0608( 66, 24, "CAM", LCD_MODE_INVERT );
 		}
 	}
+
+	if( iccard_value == 1 )
+	{
+		lcd_asc0608( 88, 24, "IC", LCD_MODE_SET );
+	}else if( iccard_value == 2 )
+	{
+		lcd_asc0608( 88, 24, "IC", LCD_MODE_INVERT );
+	}else
+	{
+	}
+
+
+
+	lcd_asc0608( 104, 24, hw_ver, LCD_MODE_SET );
+
 	lcd_update( 0, 31 );
 }
 
@@ -368,11 +378,51 @@ void showinfo( void )
 static void show( void *parent )
 {
 
+	GPIO_InitTypeDef	GPIO_InitStructure;
 
 	scr_1_idle.parent = (PSCR)parent;
 
-/*PA0 速度信号*/
+/*查询硬件版本*/
+	RCC_AHB1PeriphClockCmd( RCC_AHB1Periph_GPIOB|RCC_AHB1Periph_GPIOA , ENABLE );
+	/*去掉PB3 JTAG功能*/
+	GPIO_InitStructure.GPIO_Mode	= GPIO_Mode_IN;
+	GPIO_InitStructure.GPIO_PuPd	= GPIO_PuPd_NOPULL;
 
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_13;
+	GPIO_Init( GPIOA, &GPIO_InitStructure );
+
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_14;
+	GPIO_Init( GPIOA, &GPIO_InitStructure );
+
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_3;
+	GPIO_Init( GPIOB, &GPIO_InitStructure );
+
+	if( GPIO_ReadInputDataBit( GPIOA, GPIO_Pin_13 ) == 1 )
+	{
+		hw_ver[0] = '1';
+	}else
+	{
+		hw_ver[0] = '0';
+	}
+	if( GPIO_ReadInputDataBit( GPIOA, GPIO_Pin_14 ) == 1 )
+	{
+		hw_ver[1] = '1';
+	}else
+	{
+		hw_ver[1] = '0';
+	}
+	if( GPIO_ReadInputDataBit( GPIOB, GPIO_Pin_3 ) == 1 )
+	{
+		hw_ver[2] = '1';
+	}else
+	{
+		hw_ver[2] = '0';
+	}
+
+
+	GPIO_PinAFConfig( GPIOB, GPIO_Pin_3, GPIO_AF_SWJ);
+	GPIO_PinAFConfig( GPIOA, GPIO_Pin_13, GPIO_AF_SWJ);
+	GPIO_PinAFConfig( GPIOA, GPIO_Pin_14, GPIO_AF_SWJ);
 	showinfo( );
 }
 
@@ -461,7 +511,7 @@ static void timetick( unsigned int systick )
 		{
 			if( print_testresult_count == 0 )
 			{
-				i		= sprintf( buf, "AT%%TTS=2,3,5,\"B2E2CAD4CDEAB3C9\"\r\n" );
+				i		= sprintf( buf, "AT+ZTTS=2,\"B2E2CAD4CDEAB3C9\"\r" );
 				buf[i]	= 0;
 				pmsg	= rt_malloc( i + 1 );
 				if( pmsg != RT_NULL )
@@ -559,6 +609,14 @@ void aux_init( void )
 		GPIO_InitStructure.GPIO_PuPd	= GPIO_PuPd_DOWN;
 		GPIO_Init( PIN_OUT[i].port, &GPIO_InitStructure );
 	}
+
+	GPIO_InitStructure.GPIO_Pin		= GPIO_Pin_7;
+	GPIO_InitStructure.GPIO_Mode	= GPIO_Mode_OUT;
+	GPIO_InitStructure.GPIO_OType	= GPIO_OType_PP;
+	GPIO_InitStructure.GPIO_Speed	= GPIO_Speed_2MHz;
+	GPIO_InitStructure.GPIO_PuPd	= GPIO_PuPd_DOWN;
+	GPIO_Init( GPIOE, &GPIO_InitStructure );
+	GPIO_SetBits( GPIOE, GPIO_Pin_7 );
 
 	GPIO_InitStructure.GPIO_Mode	= GPIO_Mode_IN;
 	GPIO_InitStructure.GPIO_PuPd	= GPIO_PuPd_NOPULL;

@@ -638,7 +638,7 @@ void thread_gps_check_ver( void* parameter )
 
 	if( ok )
 	{
-		sprintf( buf, "EÄ£¿éTD%d (%d.%d.%d)", model / 10, ver[0], ver[1], ver[2] );
+		sprintf( buf, "EÄ£¿éTD%d (%d.%d.%d)", model, ver[0], ver[1], ver[2] );
 		msg( buf );
 	}else
 	{

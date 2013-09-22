@@ -28,7 +28,6 @@
 
 #include "common.h"
 
-#ifdef M66
 
 #define GSM_GPIO			GPIOC
 #define GSM_TX_PIN			GPIO_Pin_10
@@ -1175,6 +1174,5 @@ rt_size_t gsm_ipsend( uint8_t* buff, rt_size_t count, rt_int32_t timeout )
 	return ret;
 }
 
-#endif
 
 /************************************** The End Of File **************************************/

@@ -27,8 +27,7 @@
 //#define M66
 //#define MC323
 //#define EM310
-
-#define MC8332
+//#define MC8332
 
 
 

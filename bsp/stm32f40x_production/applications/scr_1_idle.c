@@ -197,7 +197,7 @@ static print_testresult( void )
 	sprintf( buf, "    定位模式:%s 星数:%d\r\n", gps_mode[gps_status.mode], gps_status.NoSV );
 	printer( buf );
 
-	sprintf( buf, "\r\n\nCDMA-MC8332 VER:%s\r\n", gsm_ver );
+	sprintf( buf, "\r\n\nGSM_M66 VER:%s\r\n", gsm_ver );
 	printer( buf );
 	sprintf( buf, "    登网用时:%02d:%02d\r\n", gprs_ok_past_sec / 60, gprs_ok_past_sec % 60 );
 	printer( buf );

@@ -276,7 +276,7 @@ void showinfo( void )
 	sprintf( buf, "%02d:%02d  %04d", gps_sec_count / 60, gps_sec_count % 60, Frequency );
 	lcd_asc0608( 0, 0, buf, LCD_MODE_SET );
 
-	lcd_asc0608( 122 - 6 * 6, 0, "090501", LCD_MODE_SET );
+	lcd_asc0608( 122 - 6 * 6, 0, "140211", LCD_MODE_SET );
 
 	if( gps_fixed_sec )
 	{

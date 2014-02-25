@@ -61,6 +61,8 @@ extern struct rt_device			dev_vuart;
 
 static rt_uint8_t				*ptr_mem_packet = RT_NULL;
 
+static uint8_t					gps_log_out = 0;
+
 //*****************************************
 //CRC16 高字节表
 //*****************************************
@@ -415,6 +417,11 @@ static void rt_thread_entry_gps( void* parameter )
 			jt808_alarm &= ~BIT_ALARM_GPS_ERR;
 			if( flag_bd_upgrade_uart == 0 )
 			{
+				buf.body[buf.wr]=0;
+				if( gps_log_out )
+				{
+					rt_kprintf( "\n%s", buf.body );
+				}
 				gps_rx( buf.body, buf.wr );
 			}else
 			{
@@ -661,7 +668,6 @@ lbl_check_ver_err:
 	//msg( buf );
 }
 
-
 /*更新北斗线程，使用U盘更新*/
 void thread_gps_upgrade_udisk( void* parameter )
 {
@@ -670,7 +676,7 @@ void thread_gps_upgrade_udisk( void* parameter )
 	void		( *msg )( void *p );
 	int			fd = -1, count = 0;
 	rt_uint8_t	*pdata; /*数据*/
-	uint8_t		cmd_reset[11] = { 0x40, 0x34, 0xC0, 0x00, 0x34, 0x00, 0x01, 0x84, 0x6B, 0x0D, 0x0A };
+	uint8_t		cmd_reset[11]	= { 0x40, 0x34, 0xC0, 0x00, 0x34, 0x00, 0x01, 0x84, 0x6B, 0x0D, 0x0A };
 	uint8_t		cmd_query[11]	= { 0x40, 0x10, 0xC0, 0x00, 0x10, 0x00, 0x01, 0xC2, 0x84, 0x0D, 0x0A };
 	uint8_t		cmd_enter[11]	= { 0x40, 0x30, 0xC0, 0x00, 0x03, 0x00, 0x01, 0x34, 0x21, 0x0D, 0x0A };
 
@@ -1030,5 +1036,13 @@ rt_size_t gps_reset( uint8_t start_mode )
 {
 //	dev_gps_write( &dev_gps, 0, reset_str[start_mode * 3 + gps_status.mode - 1], 15 );
 }
+
+/**/
+rt_size_t gps_dump( uint8_t start_mode )
+{
+	gps_log_out = ~gps_log_out;
+}
+
+FINSH_FUNCTION_EXPORT( gps_dump, dump gps log );
 
 /************************************** The End Of File **************************************/

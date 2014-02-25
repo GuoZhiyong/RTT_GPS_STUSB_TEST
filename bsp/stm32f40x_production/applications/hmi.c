@@ -149,17 +149,6 @@ static uint32_t  keycheck( void )
 			j |= ( 1 << i );
 		}
 	}
-/*ÔüÍÁ³µ²âÊÔ*/
-	if( GPIO_ReadInputDataBit( PIN_IN[0].port, PIN_IN[0].pin ))
-		{
-			GPIO_ResetBits(GPIOE,GPIO_Pin_7);
-		}
-	else
-		{
-			GPIO_SetBits(GPIOE,GPIO_Pin_7);
-		}
-
-
 	
 	if( j ^ aux_io_status )
 	{

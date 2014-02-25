@@ -380,7 +380,7 @@ void gps_rx( uint8_t * pinfo, uint16_t length )
 		
 		ret = process_rmc( (uint8_t*)psrc );
 	}
-
+#if 0
 	if( strncmp( psrc + 3, "TXT,", 4 ) == 0 )
 	{
 		if(bd_model!=0x3017)		/*ÐÍºÅÇÐ»» ´òÓ¡µÄ3.3V ·äÃùÆ÷*/
@@ -405,6 +405,7 @@ void gps_rx( uint8_t * pinfo, uint16_t length )
 		}
 
 	}
+#endif	
 }
 
 /************************************** The End Of File **************************************/

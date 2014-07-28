@@ -297,7 +297,7 @@ void showinfo( void )
 	sprintf( buf, "%02d %c %02d:%02d:%02d", gps_status.NoSV, gps_av, gps_hour, gps_minute, gps_sec );
 	lcd_asc0608( 44, 8, buf, LCD_MODE_SET );
 
-	if( gsm_csq != 0xff )
+	if( gsm_csq >=0)//有效的场强值
 	{
 		if( gsm_csq_min > gsm_csq )
 		{

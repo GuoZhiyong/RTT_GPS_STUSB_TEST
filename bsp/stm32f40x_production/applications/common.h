@@ -60,7 +60,7 @@
 
 extern uint8_t	rtc_ok;
 extern uint32_t rtc_retry;
-extern uint8_t	gsm_csq;
+extern int8_t	gsm_csq;
 extern uint32_t gprs_ok_past_sec;
 extern char		gsm_ver[8];
 extern uint8_t	mems_status;

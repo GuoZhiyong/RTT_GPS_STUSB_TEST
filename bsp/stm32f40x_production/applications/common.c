@@ -4,7 +4,7 @@ uint8_t		rtc_ok = 0;
 uint32_t		rtc_retry=0;
 
 
-uint8_t	gsm_csq=0xFF;
+int8_t	gsm_csq=-1;   //修改为int8_t 类型 -1 代表还没有信号
 
 uint32_t		gprs_ok_past_sec = 0;
 char			gsm_ver[8];

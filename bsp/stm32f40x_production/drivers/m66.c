@@ -28,7 +28,6 @@
 
 #include "common.h"
 
-
 #define GSM_GPIO			GPIOC
 #define GSM_TX_PIN			GPIO_Pin_10
 #define GSM_TX_PIN_SOURCE	GPIO_PinSource10
@@ -114,12 +113,12 @@ void UART4_IRQHandler( void )
 	}
 
 
-/*
-   if (USART_GetITStatus(UART4, USART_IT_TC) != RESET)
-   {
-   USART_ClearITPendingBit(UART4, USART_IT_TC);
-   }
- */
+	/*
+	   if (USART_GetITStatus(UART4, USART_IT_TC) != RESET)
+	   {
+	   USART_ClearITPendingBit(UART4, USART_IT_TC);
+	   }
+	 */
 	rt_interrupt_leave( );
 }
 
@@ -223,7 +222,7 @@ static void sys_default_cb( char *pInfo, uint16_t len )
 	char	match = 0;
 
 	rt_kprintf( "\rrx>%s", pInfo );
-/*有可能是主动挂断，也有可能网络链接断开，是否要通知? 不需要*/
+	/*有可能是主动挂断，也有可能网络链接断开，是否要通知? 不需要*/
 	if( strncmp( pInfo, "%IPCLOSE", 7 ) == 0 )
 	{
 	}
@@ -349,10 +348,10 @@ static rt_err_t m66_init( rt_device_t dev )
 	GPIO_ResetBits( GSM_TERMON_PORT, GSM_TERMON_PIN );
 
 
-/*
-   RESET在开机过程不需要做任何时序配合（和通常CPU 的 reset不同）。
-   建议该管脚接OC输出的GPIO，开机时 OC 输出高阻。
- */
+	/*
+	   RESET在开机过程不需要做任何时序配合（和通常CPU 的 reset不同）。
+	   建议该管脚接OC输出的GPIO，开机时 OC 输出高阻。
+	 */
 	GPIO_InitStructure.GPIO_Mode	= GPIO_Mode_OUT;
 	GPIO_InitStructure.GPIO_OType	= GPIO_OType_OD;
 	GPIO_InitStructure.GPIO_PuPd	= GPIO_PuPd_NOPULL;
@@ -366,10 +365,9 @@ static rt_err_t m66_init( rt_device_t dev )
 	GPIO_InitStructure.GPIO_Pin		= GPIO_Pin_9;
 	GPIO_Init( GPIOD, &GPIO_InitStructure );
 	//GPIO_SetBits( GPIOD, GPIO_Pin_9 );	/*关功放*/
-	GPIO_ResetBits( GPIOD, GPIO_Pin_9 );	/*开功放*/
+	GPIO_ResetBits( GPIOD, GPIO_Pin_9 ); /*开功放*/
 
-
-/*uart4 管脚设置*/
+	/*uart4 管脚设置*/
 
 	/* Configure USART Tx as alternate function  */
 	GPIO_InitStructure.GPIO_OType	= GPIO_OType_PP;
@@ -532,7 +530,7 @@ static void gsmrx_cb( uint8_t *pInfo, uint16_t len )
 	uint8_t			*psrc, *pdst;
 	int32_t			infolen, link;
 
-/*网络侧的信息，直接通知上层软件*/
+	/*网络侧的信息，直接通知上层软件*/
 	if( fgsm_rawdata_out )
 	{
 		rt_kprintf( "\r\n%08d gsm_rx>%s\r\n", rt_tick_get( ), pInfo );
@@ -540,10 +538,10 @@ static void gsmrx_cb( uint8_t *pInfo, uint16_t len )
 	}
 
 
-/*
-   会返回诸如<0d><0a>OK<0d><0a>之类的数据
-   去掉前面不必要的0d0a 和空格等不可见字符
- */
+	/*
+	   会返回诸如<0d><0a>OK<0d><0a>之类的数据
+	   去掉前面不必要的0d0a 和空格等不可见字符
+	 */
 	count = 0;
 	while( ( *( pInfo + count ) < 0x21 ) && ( count < len ) )
 	{
@@ -579,7 +577,7 @@ static void gsmrx_cb( uint8_t *pInfo, uint16_t len )
 		//gprs_rx( link, psrc, infolen );
 		return;
 	}
-/*有呼叫进来*/
+	/*有呼叫进来*/
 	if( strncmp( psrc, "RING", 4 ) == 0 )
 	{
 		lcd_msg.id				= LCD_MSG_ID_GSM;
@@ -638,12 +636,12 @@ rt_err_t pt_resp_TTS_OK( char *p, uint16_t len )
 	if( pfind )
 	{
 		tts_playing = 0;
-		if(test_flag==TEST_BIT_ALL)
+		if( test_flag == TEST_BIT_ALL )
 		{
-			print_testresult_count=9;
+			print_testresult_count = 9;
 		}
-		GPIO_SetBits( GPIOD, GPIO_Pin_9 ); /*关功放*/
-		return RT_EOK; /*找到了*/
+		GPIO_SetBits( GPIOD, GPIO_Pin_9 );  /*关功放*/
+		return RT_EOK;                      /*找到了*/
 	}
 	return RT_ERROR;
 }
@@ -742,6 +740,38 @@ rt_err_t pt_resp_CSQ( char *p, uint16_t len )
 	return RT_EOK;
 }
 
+/***********************************************************
+* Function:
+* Description:
+* Input:
+* Input:
+* Output:
+* Return:
+* Others:
+***********************************************************/
+rt_err_t pt_resp_CSQ_Check( char *p, uint16_t len )
+{
+	char		*pstr;
+	uint32_t	i, n = 0, ber = 0;
+
+	pstr = strstr( p, "+CSQ" );
+	if( pstr == (char*)0 )
+	{
+		return RT_ERROR;
+	}
+	i = sscanf( pstr, "%*[^ ] %d,%d", &n, &ber );
+	if( i != 2 )
+	{
+		return RT_ERROR;
+	}
+	gsm_csq = n;
+	if( n > 9 )
+	{
+		return RT_EOK;
+	}
+	return RT_ERROR;
+}
+
 /*+CGATT:1*/
 rt_err_t pt_resp_CGATT( char *p, uint16_t len )
 {
@@ -803,7 +833,7 @@ rt_err_t pt_resp_IPOPENX( char *p, uint16_t len )
 	{
 		gprs_ok_past_sec	= rt_tick_get( ) / 100;
 		test_flag			|= TEST_BIT_GPRS;
-		rt_kprintf("\r\ntest_flag=%x",test_flag);
+		rt_kprintf( "\r\ntest_flag=%x", test_flag );
 		return RT_EOK;
 	}
 	return RT_ERROR;
@@ -832,6 +862,24 @@ rt_err_t pt_resp_CGMR( char *p, uint16_t len )
 	return RT_ERROR;
 }
 
+/***********************************************************
+* Function:
+* Description:
+* Input:
+* Input:
+* Output:
+* Return:
+* Others:
+***********************************************************/
+rt_err_t pt_resp_TSIM( char *p, uint16_t len )
+{
+	if( strstr( p, "%TSIM 1" ) != RT_NULL )
+	{
+		return RT_EOK; /*找到了*/
+	}
+	return RT_ERROR;
+}
+
 /*通用检查函数，看是否收到数据，如果有数据后再判断*/
 rt_err_t pt_resp( RESP_FUNC func )
 {
@@ -843,7 +891,7 @@ rt_err_t pt_resp( RESP_FUNC func )
 	{
 		return RT_ETIMEOUT;
 	}
-/*有应答，执行相应的函数*/
+	/*有应答，执行相应的函数*/
 	len = ( ( *pstr ) << 8 ) | ( *( pstr + 1 ) );
 	ret = func( pstr + 2, len );
 	//rt_kprintf( "pt_resp ret=%x\r\n", ret );
@@ -858,13 +906,14 @@ typedef struct
 	AT_RESP		resp;
 	uint16_t	timeout;
 	uint16_t	retry;
-}AT_CMD_RESP;
+} AT_CMD_RESP;
 
 /*gsm供电的处理纤程*/
 
 /**/
 static int protothread_gsm_power( struct pt *pt )
 {
+#if 0
 	static AT_CMD_RESP at_init[] =
 	{
 		{ RT_NULL,											pt_resp_STR_OK,	 RT_TICK_PER_SECOND * 10, 1	 },
@@ -884,6 +933,30 @@ static int protothread_gsm_power( struct pt *pt )
 		{ "AT%IOMODE=1,2,1\r\n",							pt_resp_STR_OK,	 RT_TICK_PER_SECOND * 3,  1	 },
 		{ "AT%IPOPENX=1,\"TCP\",\"60.28.50.210\",9131\r\n", pt_resp_IPOPENX, RT_TICK_PER_SECOND * 3,  1	 },
 	};
+#else
+	static AT_CMD_RESP at_init[] =
+	{
+		{ RT_NULL,											pt_resp_STR_OK,	   RT_TICK_PER_SECOND * 10, 1  },
+		{ RT_NULL,											pt_resp_STR_OK,	   RT_TICK_PER_SECOND * 10, 1  },
+		{ "AT\r\n",											pt_resp_STR_OK,	   RT_TICK_PER_SECOND * 5,	10 },
+		{ "ATE0\r\n",										pt_resp_STR_OK,	   RT_TICK_PER_SECOND * 5,	1  },
+		{ "ATV1\r\n",										pt_resp_STR_OK,	   RT_TICK_PER_SECOND * 5,	1  },
+		{ "AT%TSIM\r\n",									pt_resp_TSIM,	   RT_TICK_PER_SECOND * 5,	10 },
+		{ "AT%TTS=2,3,5,\"BFAACABCB2E2CAD4\"\r\n",			pt_resp_STR_OK,	   RT_TICK_PER_SECOND * 20, 1  },
+		{ "AT+CPIN?\r\n",									pt_resp_CPIN,	   RT_TICK_PER_SECOND * 3,	10 },
+		{ "AT+CSQ\r\n",										pt_resp_CSQ_Check, RT_TICK_PER_SECOND * 3,	10 },
+		{ "AT+CREG=1\r\n",									pt_resp_STR_OK,	   RT_TICK_PER_SECOND * 3,	10 },
+		{ "AT+CIMI\r\n",									pt_resp_CIMI,	   RT_TICK_PER_SECOND * 3,	1  },
+		{ "AT+CGMR\r\n",									pt_resp_CGMR,	   RT_TICK_PER_SECOND * 3,	10 },
+		{ "AT+CGREG?\r\n",									pt_resp_CGREG,	   RT_TICK_PER_SECOND * 3,	10 },
+		{ "AT+CGATT?\r\n",									pt_resp_CGATT,	   RT_TICK_PER_SECOND * 3,	10 },
+		{ "AT+CGDCONT=1,\"IP\",\"CMNET\"\r\n",				pt_resp_STR_OK,	   RT_TICK_PER_SECOND * 10, 1  },
+		{ "AT%ETCPIP=1,\"\",\"\"\r\n",						pt_resp_STR_OK,	   RT_TICK_PER_SECOND * 30, 1  },
+		{ "AT%ETCPIP?\r\n",									pt_resp_ETCPIP,	   RT_TICK_PER_SECOND * 3,	1  },
+		{ "AT%IOMODE=1,2,1\r\n",							pt_resp_STR_OK,	   RT_TICK_PER_SECOND * 3,	1  },
+		{ "AT%IPOPENX=1,\"TCP\",\"60.28.50.210\",9131\r\n", pt_resp_IPOPENX,   RT_TICK_PER_SECOND * 3,	1  },
+	};
+#endif
 
 	static struct pt_timer	timer_gsm_power;
 	static uint8_t			at_init_index	= 0;
@@ -1024,7 +1097,7 @@ void gsm_init( void )
 {
 	rt_thread_t tid;
 
-/*初始化串口接收缓冲区*/
+	/*初始化串口接收缓冲区*/
 	rt_ringbuffer_init( &rb_uart4_rx, uart4_rxbuf, UART4_RX_SIZE );
 
 	rt_mb_init( &mb_gsmrx, "gsm_rx", &mb_gsmrx_pool, MB_GSMRX_POOL_SIZE / 4, RT_IPC_FLAG_FIFO );
@@ -1094,7 +1167,7 @@ rt_err_t dbgmsg( uint32_t i )
 	if( i == 0 )
 	{
 		rt_kprintf( "debmsg=%d\r\n", fgsm_rawdata_out );
-	} else
+	}else
 	{
 		fgsm_rawdata_out = i;
 	}
@@ -1165,7 +1238,7 @@ rt_size_t gsm_ipsend( uint8_t* buff, rt_size_t count, rt_int32_t timeout )
 	if( strstr( pstr + 2, "OK" ) )
 	{
 		ret = RT_EOK;
-	} else
+	}else
 	{
 		ret = RT_ERROR;
 	}
@@ -1173,6 +1246,5 @@ rt_size_t gsm_ipsend( uint8_t* buff, rt_size_t count, rt_int32_t timeout )
 
 	return ret;
 }
-
 
 /************************************** The End Of File **************************************/
